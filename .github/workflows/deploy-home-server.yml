@@ -59,6 +59,10 @@ jobs:
 
   deploy:
     needs: build-and-push
+    # 러너에 쌓인 옛 배포가 나중에 돌면서 최신 이미지를 덮어쓰지 않도록 최신 런만 남긴다
+    concurrency:
+      group: deploy-frontend
+      cancel-in-progress: true
     runs-on: [self-hosted, Linux, X64, reform-view]
 
     permissions:
@@ -73,7 +77,12 @@ jobs:
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Deploy frontend
+        env:
+          # 방금 build-and-push가 올린 이미지를 그대로 쓴다. 셸 환경변수가 .env보다 우선하므로
+          # 서버 .env의 FRONTEND_IMAGE가 옛 주소(예: 계정 이름 변경 전)여도 영향받지 않는다.
+          FRONTEND_IMAGE: ${{ env.IMAGE_NAME }}:${{ github.sha }}
         run: |
           cd "$DEPLOY_PATH"
           docker compose --env-file .env pull frontend
-          docker compose --env-file .env up -d frontend
+          # frontend는 depends_on: backend라서 --no-deps 없이 올리면 backend가 .env의 BACKEND_IMAGE로 재생성된다
+          docker compose --env-file .env up -d --no-deps frontend
