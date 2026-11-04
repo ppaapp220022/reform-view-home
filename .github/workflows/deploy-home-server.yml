@@ -59,6 +59,10 @@ jobs:
 
   deploy:
     needs: build-and-push
+    # 러너에 쌓인 옛 배포가 나중에 돌면서 최신 이미지를 덮어쓰지 않도록 최신 런만 남긴다
+    concurrency:
+      group: deploy-frontend
+      cancel-in-progress: true
     runs-on: [self-hosted, Linux, X64, reform-view]
 
     permissions:
@@ -80,4 +84,5 @@ jobs:
         run: |
           cd "$DEPLOY_PATH"
           docker compose --env-file .env pull frontend
-          docker compose --env-file .env up -d frontend
+          # frontend는 depends_on: backend라서 --no-deps 없이 올리면 backend가 .env의 BACKEND_IMAGE로 재생성된다
+          docker compose --env-file .env up -d --no-deps frontend
