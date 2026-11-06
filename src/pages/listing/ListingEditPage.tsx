@@ -19,7 +19,9 @@ import type {DeliveryType, Grade, Sport} from '../../types/listing'
 import {
   deleteListing,
   getListingDetail,
+  isUploadTooLarge,
   updateListing,
+  UPLOAD_TOO_LARGE_NOTICE,
   uploadListingImages,
 } from '../../features/listing/api/listingApi'
 
@@ -334,7 +336,9 @@ export default function ListingEditPage() {
     } catch (err) {
       /* 에러 시 submitting 해제 + 에러 메시지 표시 */
       setIsSubmitting(false)
-      setSubmitError(getApiErrorMessage(err, '수정 저장에 실패했습니다. 다시 시도해 주세요.'))
+      setSubmitError(isUploadTooLarge(err)
+        ? UPLOAD_TOO_LARGE_NOTICE
+        : getApiErrorMessage(err, '수정 저장에 실패했습니다. 다시 시도해 주세요.'))
     }
   }
   
