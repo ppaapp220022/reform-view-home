@@ -14,8 +14,8 @@
 import {formatPrice} from '../../utils/format'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {deletePostDraft, type DraftModeration, getPostDraft, savePostDraft,} from '../../features/listing/api/draftApi'
-import {createListing, suggestListingFromImage, uploadListingImages,} from '../../features/listing/api/listingApi'
-import axios from 'axios'
+import {createListing, uploadListingImages,} from '../../features/listing/api/listingApi'
+import {type AiSuggestion, type AiSuggestState, useAiSuggest} from '../../features/listing/hooks/useAiSuggest'
 import {flattenImageToWhite, resolveImageUrl} from '../../utils/image'
 import {inspectListingModeration} from '../../utils/listingModeration'
 import ConditionBadge from '../../components/ui/ConditionBadge'
@@ -388,90 +388,18 @@ function ModerationHitList({hits}: { hits: string[] }) {
   )
 }
 
-/** AI 추천 실패 안내 문구 */
-const AI_FAILED_NOTICE = 'AI 추천을 만들지 못했어요. 잠시 후 다시 시도해주세요.'
-
-/** 요청 오류를 다시 시도로 해결되는지에 따라 구분해 안내한다 */
-function aiErrorNotice(err: unknown): string {
-  if (!axios.isAxiosError(err)) return AI_FAILED_NOTICE
-  if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') {
-    return 'AI 분석이 너무 오래 걸려 중단됐어요. 잠시 후 다시 시도해주세요.'
-  }
-  if (!err.response) return '서버에 연결하지 못했어요. 네트워크 상태를 확인해주세요.'
-  if (err.response.status === 401 || err.response.status === 403) {
-    return '로그인이 만료됐어요. 다시 로그인한 뒤 시도해주세요.'
-  }
-  return AI_FAILED_NOTICE
-}
-
-/** AI 패널 — /api/listings/ai-suggest 실연동 */
+/** AI 패널 — /api/listings/ai-suggest 실연동. 추천 상태는 페이지가 가지고 모바일·데스크탑 패널이 함께 쓴다 */
 function AiPanel({
-                   form, onApply, images,
+                   form, onApply, images, ai,
                  }: {
   form: ListingForm
   /** AI 추천 결과 적용 콜백 — title + description 동시 반영 */
-  onApply: (result: { title: string; description: string }) => void
-  /** 업로드된 이미지 목록 (이번 세션에 추가한 파일이 있을 때만 AI 분석 가능) */
+  onApply: (result: AiSuggestion) => void
+  /** 업로드된 이미지 목록 (카드 프리뷰용) */
   images: DraftImageItem[]
+  ai: AiSuggestState
 }) {
-  /** 분석 중인 사진 — 사진이 바뀌면 이전 요청은 취소되므로 현재 사진일 때만 로딩으로 본다 */
-  const [loadingImage, setLoadingImage] = useState<File | null>(null)
-  const abortRef = useRef<AbortController | null>(null)
-  /** 마지막 AI 요청 결과 — 어떤 사진으로 요청했는지 함께 기억한다 (추천 카드 또는 안내 문구 중 하나) */
-  const [aiOutcome, setAiOutcome] = useState<{
-    image: File
-    result?: { title: string; description: string }
-    notice?: string
-  } | null>(null)
-  const firstLocalImage = useMemo(
-    () => images.find((image) => image.file)?.file ?? null,
-    [images],
-  )
-  /* 첫 번째 사진이 바뀌면 이전 사진의 추천·안내는 맞지 않으므로 보여주지 않는다.
-     응답이 오는 사이 사진이 바뀐 경우도 같은 기준으로 걸러진다. */
-  const currentOutcome = aiOutcome?.image === firstLocalImage ? aiOutcome : null
-  const aiResult = currentOutcome?.result ?? null
-  const aiNotice = currentOutcome?.notice ?? null
-  const aiLoading = loadingImage !== null && loadingImage === firstLocalImage
-
-  /* 첫 번째 사진이 바뀌거나 화면을 떠나면 진행 중인 요청을 취소한다 (버튼 잠김·불필요한 AI 비용 방지) */
-  useEffect(() => () => abortRef.current?.abort(), [firstLocalImage])
-
-  async function requestAiDescription() {
-    if (images.length === 0) return
-    if (!firstLocalImage) return
-    const image = firstLocalImage
-    abortRef.current?.abort()
-    const controller = new AbortController()
-    abortRef.current = controller
-    setLoadingImage(image)
-    setAiOutcome(null)
-    try {
-      /* 이번 세션에 올린 첫 번째 이미지를 multipart/form-data로 전송한다. */
-      const result = await suggestListingFromImage(image, controller.signal)
-      /* OK가 아니면 제목·설명이 빈 값이라, 적용하면 작성 중인 내용이 지워진다. 카드 대신 안내만 보여준다.
-         status가 없는 이전 백엔드 응답은 빈 값 여부로 판단한다. */
-      const hasContent = Boolean(result.title?.trim() || result.description?.trim())
-      const status = result.status ?? (hasContent ? 'OK' : 'FAILED')
-      if (status === 'OK' && hasContent) {
-        setAiOutcome({image, result: {title: result.title, description: result.description}})
-      } else if (status === 'NO_PRODUCT') {
-        setAiOutcome({image, notice: '사진에서 판매할 상품을 찾지 못했어요. 상품이 잘 보이는 사진을 첫 번째로 올려주세요.'})
-      } else {
-        setAiOutcome({image, notice: AI_FAILED_NOTICE})
-      }
-    } catch (err) {
-      /* 사진 교체·화면 이탈로 취소한 요청은 오류가 아니다 */
-      if (controller.signal.aborted) return
-      console.error('[AI 추천] 오류:', err)
-      setAiOutcome({image, notice: aiErrorNotice(err)})
-    } finally {
-      setLoadingImage((current) => (current === image ? null : current))
-    }
-  }
-  
-  /** 이미지가 1장 이상 업로드되어 있어야 AI 추천 가능 */
-  const canGenerate = firstLocalImage != null
+  const {result: aiResult, notice: aiNotice, loading: aiLoading, canGenerate} = ai
   
   return (
     <div className="flex flex-col gap-4">
@@ -487,7 +415,7 @@ function AiPanel({
             첫 번째 사진을 분석해 AI가 제목과 설명을 자동으로 작성해드립니다.
           </p>
           <button
-            onClick={requestAiDescription}
+            onClick={ai.request}
             disabled={!canGenerate || aiLoading}
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-colors disabled:opacity-50"
             style={{background: canGenerate ? 'var(--color-accent)' : 'var(--color-text-hint)'}}
@@ -506,8 +434,9 @@ function AiPanel({
           {/* AI 추천 결과 카드 */}
           {aiResult && (
             <div className="mt-3">
+              {/* 비어 있는 항목은 적용해도 바뀌지 않으므로 미리보기에서도 뺀다 */}
               {/* 추천 제목 미리보기 */}
-              <div className="mb-2">
+              {aiResult.title && <div className="mb-2">
                 <span className="text-[11px] font-semibold" style={{color: 'var(--color-text-hint)'}}>추천 제목</span>
                 <div
                   className="text-xs leading-relaxed px-3 py-2 rounded-lg mt-1"
@@ -519,9 +448,9 @@ function AiPanel({
                 >
                   {aiResult.title}
                 </div>
-              </div>
+              </div>}
               {/* 추천 설명 미리보기 */}
-              <div className="mb-3">
+              {aiResult.description && <div className="mb-3">
                 <span className="text-[11px] font-semibold" style={{color: 'var(--color-text-hint)'}}>추천 설명</span>
                 <div
                   className="text-xs leading-relaxed p-3 rounded-xl mt-1 whitespace-pre-line"
@@ -533,13 +462,13 @@ function AiPanel({
                 >
                   {aiResult.description}
                 </div>
-              </div>
+              </div>}
               <button
                 onClick={() => onApply(aiResult)}
                 className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold text-white"
                 style={{background: 'var(--color-success)'}}
               >
-                <CheckCircle2 size={13}/>제목·설명 모두 적용하기
+                <CheckCircle2 size={13}/>{aiResult.title && aiResult.description ? '제목·설명 모두 적용하기' : '추천 내용 적용하기'}
               </button>
             </div>
           )}
@@ -765,8 +694,15 @@ export default function ListingCreatePage() {
     update('sport', sport)
   }
   
+  /* AI 추천 상태 — 모바일·데스크탑 패널이 함께 쓴다. 이번 세션에 올린 첫 번째 사진을 분석한다 */
+  const firstLocalImage = useMemo(
+    () => images.find((image) => image.file)?.file ?? null,
+    [images],
+  )
+  const ai = useAiSuggest(firstLocalImage)
+  
   /* AI 추천 적용 — 제목과 설명을 동시에 업데이트. 빈 값은 작성 중인 내용을 지우므로 적용하지 않는다 */
-  function applyAiDescription({title, description}: { title: string; description: string }) {
+  function applyAiDescription({title, description}: AiSuggestion) {
     if (title.trim()) update('title', title)
     if (description.trim()) update('description', description)
   }
@@ -1123,6 +1059,7 @@ export default function ListingCreatePage() {
                 form={form}
                 onApply={applyAiDescription}
                 images={images}
+                ai={ai}
               />
             </div>
             
@@ -1254,6 +1191,7 @@ export default function ListingCreatePage() {
                 form={form}
                 onApply={applyAiDescription}
                 images={images}
+                ai={ai}
               />
             </div>
           </div>

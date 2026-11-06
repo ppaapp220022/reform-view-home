@@ -249,7 +249,11 @@ export async function getMyWishes(): Promise<PostCard[]> {
  */
 export type AiSuggestStatus = 'OK' | 'NO_PRODUCT' | 'FAILED'
 
-const AI_SUGGEST_TIMEOUT_MS = 70_000
+/**
+ * AI 추천 요청 타임아웃. 백엔드 OpenAI 호출 타임아웃(Spring AI 기본 60초, application.properties에 별도 설정 없음)보다
+ * 길어야 서버가 먼저 FAILED를 돌려줄 수 있다. 백엔드 값을 바꾸면 VITE_AI_SUGGEST_TIMEOUT_MS로 함께 조정한다.
+ */
+const AI_SUGGEST_TIMEOUT_MS = Number(import.meta.env.VITE_AI_SUGGEST_TIMEOUT_MS) || 70_000
 
 export interface AiSuggestResult {
   title: string
@@ -277,7 +281,7 @@ export async function suggestListingFromImage(
   const {data} = await apiClient.post<AiSuggestResult>(
     '/listings/ai-suggest',
     formData,
-    // Vision 분석은 15초 안팎 걸려 기본 10초 타임아웃을 넘긴다. 백엔드 OpenAI 타임아웃(60초)보다 조금 길게 둔다
+    // Vision 분석은 15초 안팎 걸려 기본 10초 타임아웃을 넘기므로 전용 타임아웃을 쓴다
     {headers: {'Content-Type': 'multipart/form-data'}, timeout: AI_SUGGEST_TIMEOUT_MS, signal},
   )
   return data
