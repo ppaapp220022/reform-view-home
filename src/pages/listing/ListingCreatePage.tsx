@@ -400,23 +400,35 @@ function AiPanel({
   const [aiLoading, setAiLoading] = useState(false)
   /** AI 추천 결과 — null이면 미생성 또는 오류 */
   const [aiResult, setAiResult] = useState<{ title: string; description: string } | null>(null)
+  /** 추천을 보여줄 수 없을 때(상품 미인식·실패) 안내 문구 */
+  const [aiNotice, setAiNotice] = useState<string | null>(null)
   const firstLocalImage = useMemo(
     () => images.find((image) => image.file)?.file ?? null,
     [images],
   )
-  
+
   async function requestAiDescription() {
     if (images.length === 0) return
     if (!firstLocalImage) return
     setAiLoading(true)
     setAiResult(null)
+    setAiNotice(null)
     try {
       /* 이번 세션에 올린 첫 번째 이미지를 multipart/form-data로 전송한다. */
       const result = await suggestListingFromImage(firstLocalImage)
-      setAiResult(result)
+      /* OK가 아니면 제목·설명이 빈 값이라, 적용하면 작성 중인 내용이 지워진다. 카드 대신 안내만 보여준다.
+         status가 없는 이전 백엔드 응답은 빈 값 여부로 판단한다. */
+      const status = result.status ?? (result.title || result.description ? 'OK' : 'FAILED')
+      if (status === 'OK') {
+        setAiResult({title: result.title, description: result.description})
+      } else if (status === 'NO_PRODUCT') {
+        setAiNotice('사진에서 판매할 상품을 찾지 못했어요. 상품이 잘 보이는 사진을 첫 번째로 올려주세요.')
+      } else {
+        setAiNotice('AI 추천을 만들지 못했어요. 잠시 후 다시 시도해주세요.')
+      }
     } catch (err) {
       console.error('[AI 추천] 오류:', err)
-      setAiResult(null)
+      setAiNotice('AI 추천을 만들지 못했어요. 잠시 후 다시 시도해주세요.')
     } finally {
       setAiLoading(false)
     }
@@ -448,6 +460,13 @@ function AiPanel({
             {aiLoading ? 'AI 생성 중...' : '설명 자동 생성'}
           </button>
           
+          {/* 추천 불가 안내 (상품 미인식·실패) */}
+          {aiNotice && (
+            <p className="text-[13px] mt-3 flex items-start gap-1" style={{color: 'var(--color-warning)'}}>
+              <AlertTriangle size={13} className="flex-shrink-0 mt-0.5"/>{aiNotice}
+            </p>
+          )}
+
           {/* AI 추천 결과 카드 */}
           {aiResult && (
             <div className="mt-3">

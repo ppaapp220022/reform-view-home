@@ -242,19 +242,35 @@ export async function getMyWishes(): Promise<PostCard[]> {
 // ── AI 판매글 도우미 API ──────────────────────────────────────────────────────
 
 /**
+ * AI 추천 결과 상태
+ * - OK: 제목·설명 추천 있음
+ * - NO_PRODUCT: 사진에서 판매할 상품을 찾지 못함
+ * - FAILED: AI 호출·응답 파싱 실패
+ */
+export type AiSuggestStatus = 'OK' | 'NO_PRODUCT' | 'FAILED'
+
+export interface AiSuggestResult {
+  title: string
+  description: string
+  /** 이전 백엔드 응답에는 없으므로 optional */
+  status?: AiSuggestStatus
+}
+
+/**
  * AI 판매글 제목/설명 자동 제안
  * POST /api/listings/ai-suggest (multipart/form-data)
  *
  * 이미지 파일을 업로드하면 Spring AI가 판매글 제목과 설명을 자동 추천
  * @param image 분석할 이미지 파일 (첫 번째 사진 권장)
- * @returns { title: string, description: string }
+ * @returns { title, description, status }
+ *   status가 'OK'가 아니면 title·description은 빈 문자열이므로 폼에 적용하지 않는다
  */
 export async function suggestListingFromImage(
   image: File,
-): Promise<{ title: string; description: string }> {
+): Promise<AiSuggestResult> {
   const formData = new FormData()
   formData.append('image', image)
-  const {data} = await apiClient.post<{ title: string; description: string }>(
+  const {data} = await apiClient.post<AiSuggestResult>(
     '/listings/ai-suggest',
     formData,
     {headers: {'Content-Type': 'multipart/form-data'}},
