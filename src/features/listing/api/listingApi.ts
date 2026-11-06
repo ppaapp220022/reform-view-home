@@ -264,11 +264,13 @@ export interface AiSuggestResult {
  *
  * 이미지 파일을 업로드하면 Spring AI가 판매글 제목과 설명을 자동 추천
  * @param image 분석할 이미지 파일 (첫 번째 사진 권장)
+ * @param signal 사진 교체·화면 이탈 시 요청을 취소하기 위한 AbortSignal
  * @returns { title, description, status }
  *   status가 'OK'가 아니면 title·description은 빈 문자열이므로 폼에 적용하지 않는다
  */
 export async function suggestListingFromImage(
   image: File,
+  signal?: AbortSignal,
 ): Promise<AiSuggestResult> {
   const formData = new FormData()
   formData.append('image', image)
@@ -276,7 +278,7 @@ export async function suggestListingFromImage(
     '/listings/ai-suggest',
     formData,
     // Vision 분석은 15초 안팎 걸려 기본 10초 타임아웃을 넘긴다. 백엔드 OpenAI 타임아웃(60초)보다 조금 길게 둔다
-    {headers: {'Content-Type': 'multipart/form-data'}, timeout: AI_SUGGEST_TIMEOUT_MS},
+    {headers: {'Content-Type': 'multipart/form-data'}, timeout: AI_SUGGEST_TIMEOUT_MS, signal},
   )
   return data
 }

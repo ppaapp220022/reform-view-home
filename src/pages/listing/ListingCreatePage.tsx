@@ -15,6 +15,7 @@ import {formatPrice} from '../../utils/format'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {deletePostDraft, type DraftModeration, getPostDraft, savePostDraft,} from '../../features/listing/api/draftApi'
 import {createListing, suggestListingFromImage, uploadListingImages,} from '../../features/listing/api/listingApi'
+import axios from 'axios'
 import {flattenImageToWhite, resolveImageUrl} from '../../utils/image'
 import {inspectListingModeration} from '../../utils/listingModeration'
 import ConditionBadge from '../../components/ui/ConditionBadge'
@@ -390,6 +391,19 @@ function ModerationHitList({hits}: { hits: string[] }) {
 /** AI 추천 실패 안내 문구 */
 const AI_FAILED_NOTICE = 'AI 추천을 만들지 못했어요. 잠시 후 다시 시도해주세요.'
 
+/** 요청 오류를 다시 시도로 해결되는지에 따라 구분해 안내한다 */
+function aiErrorNotice(err: unknown): string {
+  if (!axios.isAxiosError(err)) return AI_FAILED_NOTICE
+  if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') {
+    return 'AI 분석이 너무 오래 걸려 중단됐어요. 잠시 후 다시 시도해주세요.'
+  }
+  if (!err.response) return '서버에 연결하지 못했어요. 네트워크 상태를 확인해주세요.'
+  if (err.response.status === 401 || err.response.status === 403) {
+    return '로그인이 만료됐어요. 다시 로그인한 뒤 시도해주세요.'
+  }
+  return AI_FAILED_NOTICE
+}
+
 /** AI 패널 — /api/listings/ai-suggest 실연동 */
 function AiPanel({
                    form, onApply, images,
@@ -400,7 +414,9 @@ function AiPanel({
   /** 업로드된 이미지 목록 (이번 세션에 추가한 파일이 있을 때만 AI 분석 가능) */
   images: DraftImageItem[]
 }) {
-  const [aiLoading, setAiLoading] = useState(false)
+  /** 분석 중인 사진 — 사진이 바뀌면 이전 요청은 취소되므로 현재 사진일 때만 로딩으로 본다 */
+  const [loadingImage, setLoadingImage] = useState<File | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
   /** 마지막 AI 요청 결과 — 어떤 사진으로 요청했는지 함께 기억한다 (추천 카드 또는 안내 문구 중 하나) */
   const [aiOutcome, setAiOutcome] = useState<{
     image: File
@@ -416,16 +432,23 @@ function AiPanel({
   const currentOutcome = aiOutcome?.image === firstLocalImage ? aiOutcome : null
   const aiResult = currentOutcome?.result ?? null
   const aiNotice = currentOutcome?.notice ?? null
-  
+  const aiLoading = loadingImage !== null && loadingImage === firstLocalImage
+
+  /* 첫 번째 사진이 바뀌거나 화면을 떠나면 진행 중인 요청을 취소한다 (버튼 잠김·불필요한 AI 비용 방지) */
+  useEffect(() => () => abortRef.current?.abort(), [firstLocalImage])
+
   async function requestAiDescription() {
     if (images.length === 0) return
     if (!firstLocalImage) return
     const image = firstLocalImage
-    setAiLoading(true)
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    setLoadingImage(image)
     setAiOutcome(null)
     try {
       /* 이번 세션에 올린 첫 번째 이미지를 multipart/form-data로 전송한다. */
-      const result = await suggestListingFromImage(image)
+      const result = await suggestListingFromImage(image, controller.signal)
       /* OK가 아니면 제목·설명이 빈 값이라, 적용하면 작성 중인 내용이 지워진다. 카드 대신 안내만 보여준다.
          status가 없는 이전 백엔드 응답은 빈 값 여부로 판단한다. */
       const hasContent = Boolean(result.title?.trim() || result.description?.trim())
@@ -438,10 +461,12 @@ function AiPanel({
         setAiOutcome({image, notice: AI_FAILED_NOTICE})
       }
     } catch (err) {
+      /* 사진 교체·화면 이탈로 취소한 요청은 오류가 아니다 */
+      if (controller.signal.aborted) return
       console.error('[AI 추천] 오류:', err)
-      setAiOutcome({image, notice: AI_FAILED_NOTICE})
+      setAiOutcome({image, notice: aiErrorNotice(err)})
     } finally {
-      setAiLoading(false)
+      setLoadingImage((current) => (current === image ? null : current))
     }
   }
   
