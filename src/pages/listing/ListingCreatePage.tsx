@@ -17,10 +17,10 @@ import {deletePostDraft, type DraftModeration, getPostDraft, savePostDraft,} fro
 import {
   createListing,
   isUploadTooLarge,
-  suggestListingFromImage,
   UPLOAD_TOO_LARGE_NOTICE,
   uploadListingImages,
 } from '../../features/listing/api/listingApi'
+import {type AiSuggestion, type AiSuggestState, useAiSuggest} from '../../features/listing/hooks/useAiSuggest'
 import {flattenImageToWhite, resolveImageUrl} from '../../utils/image'
 import {inspectListingModeration} from '../../utils/listingModeration'
 import ConditionBadge from '../../components/ui/ConditionBadge'
@@ -393,43 +393,18 @@ function ModerationHitList({hits}: { hits: string[] }) {
   )
 }
 
-/** AI 패널 — /api/listings/ai-suggest 실연동 */
+/** AI 패널 — /api/listings/ai-suggest 실연동. 추천 상태는 페이지가 가지고 모바일·데스크탑 패널이 함께 쓴다 */
 function AiPanel({
-                   form, onApply, images,
+                   form, onApply, images, ai,
                  }: {
   form: ListingForm
   /** AI 추천 결과 적용 콜백 — title + description 동시 반영 */
-  onApply: (result: { title: string; description: string }) => void
-  /** 업로드된 이미지 목록 (이번 세션에 추가한 파일이 있을 때만 AI 분석 가능) */
+  onApply: (result: AiSuggestion) => void
+  /** 업로드된 이미지 목록 (카드 프리뷰용) */
   images: DraftImageItem[]
+  ai: AiSuggestState
 }) {
-  const [aiLoading, setAiLoading] = useState(false)
-  /** AI 추천 결과 — null이면 미생성 또는 오류 */
-  const [aiResult, setAiResult] = useState<{ title: string; description: string } | null>(null)
-  const firstLocalImage = useMemo(
-    () => images.find((image) => image.file)?.file ?? null,
-    [images],
-  )
-  
-  async function requestAiDescription() {
-    if (images.length === 0) return
-    if (!firstLocalImage) return
-    setAiLoading(true)
-    setAiResult(null)
-    try {
-      /* 이번 세션에 올린 첫 번째 이미지를 multipart/form-data로 전송한다. */
-      const result = await suggestListingFromImage(firstLocalImage)
-      setAiResult(result)
-    } catch (err) {
-      console.error('[AI 추천] 오류:', err)
-      setAiResult(null)
-    } finally {
-      setAiLoading(false)
-    }
-  }
-  
-  /** 이미지가 1장 이상 업로드되어 있어야 AI 추천 가능 */
-  const canGenerate = firstLocalImage != null
+  const {result: aiResult, notice: aiNotice, loading: aiLoading, canGenerate} = ai
   
   return (
     <div className="flex flex-col gap-4">
@@ -445,7 +420,7 @@ function AiPanel({
             첫 번째 사진을 분석해 AI가 제목과 설명을 자동으로 작성해드립니다.
           </p>
           <button
-            onClick={requestAiDescription}
+            onClick={ai.request}
             disabled={!canGenerate || aiLoading}
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-colors disabled:opacity-50"
             style={{background: canGenerate ? 'var(--color-accent)' : 'var(--color-text-hint)'}}
@@ -454,11 +429,19 @@ function AiPanel({
             {aiLoading ? 'AI 생성 중...' : '설명 자동 생성'}
           </button>
           
+          {/* 추천 불가 안내 (상품 미인식·실패) */}
+          {aiNotice && (
+            <p role="status" className="text-[13px] mt-3 flex items-start gap-1 text-[var(--color-warning)]">
+              <AlertTriangle size={13} className="flex-shrink-0 mt-0.5"/>{aiNotice}
+            </p>
+          )}
+          
           {/* AI 추천 결과 카드 */}
           {aiResult && (
             <div className="mt-3">
+              {/* 비어 있는 항목은 적용해도 바뀌지 않으므로 미리보기에서도 뺀다 */}
               {/* 추천 제목 미리보기 */}
-              <div className="mb-2">
+              {aiResult.title && <div className="mb-2">
                 <span className="text-[11px] font-semibold" style={{color: 'var(--color-text-hint)'}}>추천 제목</span>
                 <div
                   className="text-xs leading-relaxed px-3 py-2 rounded-lg mt-1"
@@ -470,9 +453,9 @@ function AiPanel({
                 >
                   {aiResult.title}
                 </div>
-              </div>
+              </div>}
               {/* 추천 설명 미리보기 */}
-              <div className="mb-3">
+              {aiResult.description && <div className="mb-3">
                 <span className="text-[11px] font-semibold" style={{color: 'var(--color-text-hint)'}}>추천 설명</span>
                 <div
                   className="text-xs leading-relaxed p-3 rounded-xl mt-1 whitespace-pre-line"
@@ -484,13 +467,13 @@ function AiPanel({
                 >
                   {aiResult.description}
                 </div>
-              </div>
+              </div>}
               <button
                 onClick={() => onApply(aiResult)}
                 className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold text-white"
                 style={{background: 'var(--color-success)'}}
               >
-                <CheckCircle2 size={13}/>제목·설명 모두 적용하기
+                <CheckCircle2 size={13}/>{aiResult.title && aiResult.description ? '제목·설명 모두 적용하기' : '추천 내용 적용하기'}
               </button>
             </div>
           )}
@@ -716,10 +699,17 @@ export default function ListingCreatePage() {
     update('sport', sport)
   }
   
-  /* AI 추천 적용 — 제목과 설명을 동시에 업데이트 */
-  function applyAiDescription({title, description}: { title: string; description: string }) {
-    update('title', title)
-    update('description', description)
+  /* AI 추천 상태 — 모바일·데스크탑 패널이 함께 쓴다. 이번 세션에 올린 첫 번째 사진을 분석한다 */
+  const firstLocalImage = useMemo(
+    () => images.find((image) => image.file)?.file ?? null,
+    [images],
+  )
+  const ai = useAiSuggest(firstLocalImage)
+  
+  /* AI 추천 적용 — 제목과 설명을 동시에 업데이트. 빈 값은 작성 중인 내용을 지우므로 적용하지 않는다 */
+  function applyAiDescription({title, description}: AiSuggestion) {
+    if (title.trim()) update('title', title)
+    if (description.trim()) update('description', description)
   }
   
   async function handleAddImages(files: File[]) {
@@ -1076,6 +1066,7 @@ export default function ListingCreatePage() {
                 form={form}
                 onApply={applyAiDescription}
                 images={images}
+                ai={ai}
               />
             </div>
             
@@ -1207,6 +1198,7 @@ export default function ListingCreatePage() {
                 form={form}
                 onApply={applyAiDescription}
                 images={images}
+                ai={ai}
               />
             </div>
           </div>
