@@ -249,6 +249,8 @@ export async function getMyWishes(): Promise<PostCard[]> {
  */
 export type AiSuggestStatus = 'OK' | 'NO_PRODUCT' | 'FAILED'
 
+const AI_SUGGEST_TIMEOUT_MS = 70_000
+
 export interface AiSuggestResult {
   title: string
   description: string
@@ -273,7 +275,8 @@ export async function suggestListingFromImage(
   const {data} = await apiClient.post<AiSuggestResult>(
     '/listings/ai-suggest',
     formData,
-    {headers: {'Content-Type': 'multipart/form-data'}},
+    // Vision 분석은 15초 안팎 걸려 기본 10초 타임아웃을 넘긴다. 백엔드 OpenAI 타임아웃(60초)보다 조금 길게 둔다
+    {headers: {'Content-Type': 'multipart/form-data'}, timeout: AI_SUGGEST_TIMEOUT_MS},
   )
   return data
 }
