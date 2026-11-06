@@ -387,6 +387,9 @@ function ModerationHitList({hits}: { hits: string[] }) {
   )
 }
 
+/** AI 추천 실패 안내 문구 */
+const AI_FAILED_NOTICE = 'AI 추천을 만들지 못했어요. 잠시 후 다시 시도해주세요.'
+
 /** AI 패널 — /api/listings/ai-suggest 실연동 */
 function AiPanel({
                    form, onApply, images,
@@ -398,51 +401,45 @@ function AiPanel({
   images: DraftImageItem[]
 }) {
   const [aiLoading, setAiLoading] = useState(false)
-  /** AI 추천 결과 — null이면 미생성 또는 오류 */
-  const [aiResult, setAiResult] = useState<{ title: string; description: string } | null>(null)
-  /** 추천을 보여줄 수 없을 때(상품 미인식·실패) 안내 문구 */
-  const [aiNotice, setAiNotice] = useState<string | null>(null)
+  /** 마지막 AI 요청 결과 — 어떤 사진으로 요청했는지 함께 기억한다 (추천 카드 또는 안내 문구 중 하나) */
+  const [aiOutcome, setAiOutcome] = useState<{
+    image: File
+    result?: { title: string; description: string }
+    notice?: string
+  } | null>(null)
   const firstLocalImage = useMemo(
     () => images.find((image) => image.file)?.file ?? null,
     [images],
   )
-  /** 지금 화면의 첫 번째 사진 — 응답이 도착했을 때 요청한 사진과 같은지 비교한다 */
-  const currentImage = useRef<File | null>(null)
-
-  /* 첫 번째 사진이 바뀌면 이전 사진의 추천·안내는 맞지 않으므로 지운다 */
-  useEffect(() => {
-    currentImage.current = firstLocalImage
-    setAiResult(null)
-    setAiNotice(null)
-  }, [firstLocalImage])
-
+  /* 첫 번째 사진이 바뀌면 이전 사진의 추천·안내는 맞지 않으므로 보여주지 않는다.
+     응답이 오는 사이 사진이 바뀐 경우도 같은 기준으로 걸러진다. */
+  const currentOutcome = aiOutcome?.image === firstLocalImage ? aiOutcome : null
+  const aiResult = currentOutcome?.result ?? null
+  const aiNotice = currentOutcome?.notice ?? null
+  
   async function requestAiDescription() {
     if (images.length === 0) return
     if (!firstLocalImage) return
     const image = firstLocalImage
     setAiLoading(true)
-    setAiResult(null)
-    setAiNotice(null)
+    setAiOutcome(null)
     try {
       /* 이번 세션에 올린 첫 번째 이미지를 multipart/form-data로 전송한다. */
       const result = await suggestListingFromImage(image)
-      /* 응답이 오는 사이 첫 번째 사진이 바뀌었으면 이전 사진의 결과이므로 버린다 */
-      if (currentImage.current !== image) return
       /* OK가 아니면 제목·설명이 빈 값이라, 적용하면 작성 중인 내용이 지워진다. 카드 대신 안내만 보여준다.
          status가 없는 이전 백엔드 응답은 빈 값 여부로 판단한다. */
       const hasContent = Boolean(result.title?.trim() || result.description?.trim())
       const status = result.status ?? (hasContent ? 'OK' : 'FAILED')
       if (status === 'OK' && hasContent) {
-        setAiResult({title: result.title, description: result.description})
+        setAiOutcome({image, result: {title: result.title, description: result.description}})
       } else if (status === 'NO_PRODUCT') {
-        setAiNotice('사진에서 판매할 상품을 찾지 못했어요. 상품이 잘 보이는 사진을 첫 번째로 올려주세요.')
+        setAiOutcome({image, notice: '사진에서 판매할 상품을 찾지 못했어요. 상품이 잘 보이는 사진을 첫 번째로 올려주세요.'})
       } else {
-        setAiNotice('AI 추천을 만들지 못했어요. 잠시 후 다시 시도해주세요.')
+        setAiOutcome({image, notice: AI_FAILED_NOTICE})
       }
     } catch (err) {
       console.error('[AI 추천] 오류:', err)
-      if (currentImage.current !== image) return
-      setAiNotice('AI 추천을 만들지 못했어요. 잠시 후 다시 시도해주세요.')
+      setAiOutcome({image, notice: AI_FAILED_NOTICE})
     } finally {
       setAiLoading(false)
     }
@@ -476,11 +473,11 @@ function AiPanel({
           
           {/* 추천 불가 안내 (상품 미인식·실패) */}
           {aiNotice && (
-            <p className="text-[13px] mt-3 flex items-start gap-1" style={{color: 'var(--color-warning)'}}>
+            <p role="status" className="text-[13px] mt-3 flex items-start gap-1 text-[var(--color-warning)]">
               <AlertTriangle size={13} className="flex-shrink-0 mt-0.5"/>{aiNotice}
             </p>
           )}
-
+          
           {/* AI 추천 결과 카드 */}
           {aiResult && (
             <div className="mt-3">
