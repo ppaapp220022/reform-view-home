@@ -14,7 +14,12 @@
 import {formatPrice} from '../../utils/format'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {deletePostDraft, type DraftModeration, getPostDraft, savePostDraft,} from '../../features/listing/api/draftApi'
-import {createListing, uploadListingImages,} from '../../features/listing/api/listingApi'
+import {
+  createListing,
+  isUploadTooLarge,
+  UPLOAD_TOO_LARGE_NOTICE,
+  uploadListingImages,
+} from '../../features/listing/api/listingApi'
 import {type AiSuggestion, type AiSuggestState, useAiSuggest} from '../../features/listing/hooks/useAiSuggest'
 import {flattenImageToWhite, resolveImageUrl} from '../../utils/image'
 import {inspectListingModeration} from '../../utils/listingModeration'
@@ -735,10 +740,12 @@ export default function ListingCreatePage() {
           return {...image, uploadedUrl}
         })
       })
-    } catch {
+    } catch (err) {
       nextItems.forEach((image) => URL.revokeObjectURL(image.previewUrl))
       setImages((prev) => prev.filter((image) => !nextItems.some((item) => item.id === image.id)))
-      setSubmitError('이미지 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.')
+      setSubmitError(isUploadTooLarge(err)
+        ? UPLOAD_TOO_LARGE_NOTICE
+        : '이미지 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.')
     }
   }
   
