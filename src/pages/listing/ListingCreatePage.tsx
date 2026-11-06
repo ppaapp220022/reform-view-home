@@ -406,20 +406,33 @@ function AiPanel({
     () => images.find((image) => image.file)?.file ?? null,
     [images],
   )
+  /** 지금 화면의 첫 번째 사진 — 응답이 도착했을 때 요청한 사진과 같은지 비교한다 */
+  const currentImage = useRef<File | null>(null)
+
+  /* 첫 번째 사진이 바뀌면 이전 사진의 추천·안내는 맞지 않으므로 지운다 */
+  useEffect(() => {
+    currentImage.current = firstLocalImage
+    setAiResult(null)
+    setAiNotice(null)
+  }, [firstLocalImage])
 
   async function requestAiDescription() {
     if (images.length === 0) return
     if (!firstLocalImage) return
+    const image = firstLocalImage
     setAiLoading(true)
     setAiResult(null)
     setAiNotice(null)
     try {
       /* 이번 세션에 올린 첫 번째 이미지를 multipart/form-data로 전송한다. */
-      const result = await suggestListingFromImage(firstLocalImage)
+      const result = await suggestListingFromImage(image)
+      /* 응답이 오는 사이 첫 번째 사진이 바뀌었으면 이전 사진의 결과이므로 버린다 */
+      if (currentImage.current !== image) return
       /* OK가 아니면 제목·설명이 빈 값이라, 적용하면 작성 중인 내용이 지워진다. 카드 대신 안내만 보여준다.
          status가 없는 이전 백엔드 응답은 빈 값 여부로 판단한다. */
-      const status = result.status ?? (result.title || result.description ? 'OK' : 'FAILED')
-      if (status === 'OK') {
+      const hasContent = Boolean(result.title?.trim() || result.description?.trim())
+      const status = result.status ?? (hasContent ? 'OK' : 'FAILED')
+      if (status === 'OK' && hasContent) {
         setAiResult({title: result.title, description: result.description})
       } else if (status === 'NO_PRODUCT') {
         setAiNotice('사진에서 판매할 상품을 찾지 못했어요. 상품이 잘 보이는 사진을 첫 번째로 올려주세요.')
@@ -428,6 +441,7 @@ function AiPanel({
       }
     } catch (err) {
       console.error('[AI 추천] 오류:', err)
+      if (currentImage.current !== image) return
       setAiNotice('AI 추천을 만들지 못했어요. 잠시 후 다시 시도해주세요.')
     } finally {
       setAiLoading(false)
@@ -729,10 +743,10 @@ export default function ListingCreatePage() {
     update('sport', sport)
   }
   
-  /* AI 추천 적용 — 제목과 설명을 동시에 업데이트 */
+  /* AI 추천 적용 — 제목과 설명을 동시에 업데이트. 빈 값은 작성 중인 내용을 지우므로 적용하지 않는다 */
   function applyAiDescription({title, description}: { title: string; description: string }) {
-    update('title', title)
-    update('description', description)
+    if (title.trim()) update('title', title)
+    if (description.trim()) update('description', description)
   }
   
   async function handleAddImages(files: File[]) {
