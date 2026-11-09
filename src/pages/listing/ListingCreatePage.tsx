@@ -21,6 +21,7 @@ import {
   uploadListingImages,
 } from '../../features/listing/api/listingApi'
 import {type AiSuggestion, type AiSuggestState, useAiSuggest} from '../../features/listing/hooks/useAiSuggest'
+import useMediaQuery from '../../hooks/useMediaQuery'
 import {flattenImageToWhite, resolveImageUrl} from '../../utils/image'
 import {inspectListingModeration} from '../../utils/listingModeration'
 import ConditionBadge from '../../components/ui/ConditionBadge'
@@ -705,6 +706,8 @@ export default function ListingCreatePage() {
     [images],
   )
   const ai = useAiSuggest(firstLocalImage)
+  // AI 패널을 데스크탑(xl, 1280px 이상)은 오른쪽, 그보다 좁으면 본문 안 한 곳에만 그린다
+  const isDesktop = useMediaQuery('(min-width: 1280px)')
   
   /* AI 추천 적용 — 제목과 설명을 동시에 업데이트. 빈 값은 작성 중인 내용을 지우므로 적용하지 않는다 */
   function applyAiDescription({title, description}: AiSuggestion) {
@@ -1060,15 +1063,17 @@ export default function ListingCreatePage() {
               </div>
             </div>
             
-            {/* AI 패널 (모바일: 인라인) */}
-            <div className="xl:hidden">
-              <AiPanel
-                form={form}
-                onApply={applyAiDescription}
-                images={images}
-                ai={ai}
-              />
-            </div>
+            {/* AI 패널 (모바일: 인라인) - 화면 크기에 맞는 한 곳에만 그린다 */}
+            {!isDesktop && (
+              <div className="xl:hidden">
+                <AiPanel
+                  form={form}
+                  onApply={applyAiDescription}
+                  images={images}
+                  ai={ai}
+                />
+              </div>
+            )}
             
             {/* 상품 설명 */}
             <div className="rounded-2xl p-5"
@@ -1194,12 +1199,14 @@ export default function ListingCreatePage() {
           {/* ── 우: AI 패널 (데스크탑) ───────────────────────────────── */}
           <div className="hidden xl:block w-72 flex-shrink-0">
             <div className="sticky top-20 flex flex-col gap-4">
-              <AiPanel
-                form={form}
-                onApply={applyAiDescription}
-                images={images}
-                ai={ai}
-              />
+              {isDesktop && (
+                <AiPanel
+                  form={form}
+                  onApply={applyAiDescription}
+                  images={images}
+                  ai={ai}
+                />
+              )}
             </div>
           </div>
         </div>
