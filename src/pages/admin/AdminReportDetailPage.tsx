@@ -159,8 +159,9 @@ export default function AdminReportDetailPage() {
    * 미처리 상태에서는 초기값으로 불러와 추가 편집도 가능하게 한다.
    */
   // 신고나 저장된 메모가 바뀌면 렌더 중에 입력값을 맞춘다 (effect 안 setState는 렌더를 한 번 더 일으킨다)
+  //  - 처음 값은 null: 캐시에 있던 신고를 다시 열어 첫 렌더부터 데이터가 있어도 한 번은 맞춘다
   const memoSource = `${report?.reportId}:${report?.adminMemo ?? ''}`
-  const [syncedMemoSource, setSyncedMemoSource] = useState(memoSource)
+  const [syncedMemoSource, setSyncedMemoSource] = useState<string | null>(null)
   if (syncedMemoSource !== memoSource) {
     setSyncedMemoSource(memoSource)
     setAdminMemo(report?.adminMemo ?? '')

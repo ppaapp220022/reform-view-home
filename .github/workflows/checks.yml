@@ -4,8 +4,9 @@ name: checks
 
 on:
   # 백엔드 checks와 같이 브랜치 push 기준으로 돌린다. 결과가 커밋에 붙어 PR 체크로도 보인다
+  #  - master는 PR 브랜치에서 이미 검사했고 배포가 같은 이미지를 빌드하므로 뺀다
   push:
-    branches: [ '**' ]
+    branches-ignore: [ master ]
   workflow_dispatch:
 
 concurrency:
@@ -16,7 +17,7 @@ permissions:
   contents: read
 
 jobs:
-  # lint(오류만 실패, 경고는 통과) + 타입 검사 + 빌드
+  # lint(오류만 실패, 경고는 통과). 타입 검사·빌드는 docker 작업의 Dockerfile(npm run build = tsc -b + vite)이 한다
   checks:
     runs-on: ubuntu-22.04
     steps:
@@ -33,9 +34,6 @@ jobs:
 
       - name: Lint
         run: npm run lint -- --quiet
-
-      - name: Build
-        run: npm run build
 
   # 배포와 같은 Dockerfile로 이미지가 만들어지는지 (push는 하지 않는다)
   docker:
