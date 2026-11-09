@@ -19,10 +19,10 @@ const STATUS_QUERY_KEY = ['admin-embed-status']
 const POLL_INTERVAL_MS = 2_000
 
 const STATE_LABELS: Record<EmbedJobState, { label: string; color: string; bg: string }> = {
-  IDLE: {label: '대기', color: 'var(--color-text-hint)', bg: 'rgba(0,0,0,.06)'},
-  RUNNING: {label: '진행 중', color: 'var(--color-warning)', bg: 'rgba(255,149,0,.1)'},
-  DONE: {label: '완료', color: 'var(--color-success)', bg: 'rgba(0,179,110,.1)'},
-  FAILED: {label: '실패', color: 'var(--color-accent)', bg: 'rgba(255,46,77,.1)'},
+  IDLE: {label: '대기', color: 'var(--color-text-hint)', bg: 'var(--color-surface-overlay)'},
+  RUNNING: {label: '진행 중', color: 'var(--color-warning)', bg: 'var(--color-warning-bg)'},
+  DONE: {label: '완료', color: 'var(--color-success)', bg: 'var(--color-success-bg)'},
+  FAILED: {label: '실패', color: 'var(--color-error)', bg: 'var(--color-error-bg)'},
 }
 
 /** 서버 LocalDateTime("2026-11-09T20:41:05.123") → "2026-11-09 20:41:05" */
@@ -48,8 +48,16 @@ export default function SearchEmbeddingPanel() {
 
   const {mutate: start, isPending, error: startError} = useMutation({
     mutationFn: startEmbedJob,
+    // 이미 나가 있던 상태 조회가 시작 뒤에 도착해 RUNNING을 덮어쓰지 않게 먼저 취소한다
+    async onMutate() {
+      await queryClient.cancelQueries({queryKey: STATUS_QUERY_KEY})
+    },
     onSuccess(next: EmbedJobStatus) {
       queryClient.setQueryData(STATUS_QUERY_KEY, next)
+    },
+    // 시작 요청이 타임아웃 등으로 실패해도 서버에선 시작됐을 수 있으니 실제 상태를 다시 읽는다
+    onError() {
+      void queryClient.invalidateQueries({queryKey: STATUS_QUERY_KEY})
     },
   })
 
@@ -95,13 +103,13 @@ export default function SearchEmbeddingPanel() {
       </p>
 
       {isError && (
-        <p className="flex items-center gap-1.5 text-xs mt-3 text-[var(--color-accent)]">
+        <p className="flex items-center gap-1.5 text-xs mt-3 text-[var(--color-error)]">
           <AlertCircle size={13}/>진행 상황을 불러오지 못했습니다.
         </p>
       )}
 
       {startError && (
-        <p className="flex items-center gap-1.5 text-xs mt-3 text-[var(--color-accent)]">
+        <p className="flex items-center gap-1.5 text-xs mt-3 text-[var(--color-error)]">
           <AlertCircle size={13}/>{startErrorMessage(startError)}
         </p>
       )}
@@ -109,7 +117,7 @@ export default function SearchEmbeddingPanel() {
       {status && status.state !== 'IDLE' && (
         <div className="mt-4 flex flex-col gap-2 text-xs text-[var(--color-text-sub)]">
           <div
-            className="h-2 rounded-full overflow-hidden bg-[var(--color-surface-raised)]"
+            className="h-2 rounded-full overflow-hidden bg-[var(--color-surface-sunken)]"
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={100}
@@ -123,13 +131,13 @@ export default function SearchEmbeddingPanel() {
           <p>
             {formatNumber(status.processed)} / {formatNumber(status.total)}건 처리 ({percent}%)
             · 저장 {formatNumber(status.embedded)}건
-            · 실패 <span className={status.failed > 0 ? 'text-[var(--color-accent)]' : undefined}>{formatNumber(status.failed)}건</span>
+            · 실패 <span className={status.failed > 0 ? 'text-[var(--color-error)]' : undefined}>{formatNumber(status.failed)}건</span>
           </p>
           <p>시작 {formatTime(status.startedAt)} · 종료 {formatTime(status.finishedAt)}</p>
           {status.cleanup && <p>정리: {status.cleanup}</p>}
           {status.searchCheck && <p>검색 확인: {status.searchCheck}</p>}
           {status.lastError && (
-            <p className="text-[var(--color-accent)]">마지막 오류: {status.lastError}</p>
+            <p className="text-[var(--color-error)]">마지막 오류: {status.lastError}</p>
           )}
         </div>
       )}
