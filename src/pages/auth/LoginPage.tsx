@@ -246,6 +246,14 @@ function CodeForm({email, onSubmit, isPending, errorMessage, onBack, verificatio
 
 // ── 메인 컴포넌트 ─────────────────────────────────────────────────────────────
 
+// 포트폴리오용 더미 계정 (일부러 공개) - 관리자 화면까지 바로 확인할 수 있게 관리자 계정도 둔다
+// 백엔드 dummy.sql 시드 계정이며, DummyDataInitializer가 비밀번호를 1234로 맞춘다
+const DEMO_PASSWORD = '1234'
+const DEMO_ACCOUNTS = [
+  {label: '관리자로 체험', email: 'admin@reform.com'},
+  {label: '일반 회원으로 체험', email: 'user001@reform.com'},
+] as const
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -298,10 +306,9 @@ export default function LoginPage() {
     )
   }
 
-  // 공개 사이트에 노출되는 계정이므로 관리자 대신 일반 회원(USER) 더미 계정을 쓴다
-  function applyDummyAccount() {
-    setEmail('user001@reform.com')
-    setPassword('1234')
+  function applyDummyAccount(dummyEmail: string) {
+    setEmail(dummyEmail)
+    setPassword(DEMO_PASSWORD)
     setStep1Error(null)
   }
   
@@ -409,47 +416,35 @@ export default function LoginPage() {
               </Link>
             </p>
             
-            {/* 포트폴리오용 테스트 계정 안내 */}
-            <button
-              type="button"
-              onClick={applyDummyAccount}
-              className="mb-6 w-full text-left px-4 py-3 rounded-[10px] border text-[13px] leading-relaxed transition-colors hover:bg-[rgba(0,33,71,0.09)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2"
-              style={{
-                background: 'rgba(0,33,71,0.06)',
-                borderColor: 'var(--color-border)',
-              }}
-              aria-label="테스트 계정 정보 자동 입력"
+            {/* 포트폴리오용 테스트 계정 - 관리자 화면과 일반 거래 흐름을 둘 다 바로 볼 수 있게 두 계정을 둔다 */}
+            <div
+              className="mb-6 px-4 py-3 rounded-[10px] border text-[13px] leading-relaxed border-[var(--color-border)]"
+              style={{background: 'rgba(0,33,71,0.06)'}}
             >
-              <div className="flex items-center justify-between gap-3 mb-1">
-                <p className="font-medium text-[var(--color-text-sub)]">
-                  테스트 계정
-                </p>
-                <span className="text-[12px] font-medium text-[var(--color-primary)]">
-                  클릭해서 자동 입력
-                </span>
+              <p className="mb-2">
+                <span className="font-medium text-[var(--color-text-sub)]">테스트 계정</span>
+                <span className="ml-2 text-[12px] text-[var(--color-text-hint)]">누르면 자동 입력 · 비밀번호 1234</span>
+              </p>
+              <div className="flex flex-col gap-2">
+                {DEMO_ACCOUNTS.map(account => (
+                  <button
+                    key={account.email}
+                    type="button"
+                    onClick={() => applyDummyAccount(account.email)}
+                    className="px-3 py-2 rounded-lg border border-solid text-left transition-colors bg-[var(--color-surface)] border-[var(--color-border-strong)] hover:border-[var(--color-text-hint)] focus:outline-none focus:ring-2 focus:ring-[var(--color-border-focus)]"
+                    aria-label={`${account.label} 계정 정보 자동 입력`}
+                  >
+                    <span className="block text-[13px] font-medium text-[var(--color-text-main)]">{account.label}</span>
+                    <span
+                      className="block text-[12px] text-[var(--color-text-hint)]"
+                      style={{fontFamily: "'Pretendard',Giants,sans-serif"}}
+                    >
+                      {account.email}
+                    </span>
+                  </button>
+                ))}
               </div>
-              <p className="text-[var(--color-text-hint)]">
-                이메일:{' '}
-                <span
-                  className="font-medium text-[var(--color-text-sub)]"
-                  style={{fontFamily: "'Pretendard',Giants,sans-serif"}}
-                >
-                  user001@reform.com
-                </span>
-              </p>
-              <p className="text-[var(--color-text-hint)]">
-                비밀번호:{' '}
-                <span
-                  className="font-medium text-[var(--color-text-sub)]"
-                  style={{fontFamily: "'Pretendard',Giants,sans-serif"}}
-                >
-                  1234
-                </span>
-              </p>
-              <p className="mt-2 text-[12px] text-[var(--color-text-hint)]">
-                테스트용 계정을 빠르게 채워 넣습니다.
-              </p>
-            </button>
+            </div>
             
             {/* 소셜 로그인 버튼 */}
             <div className="flex flex-col gap-[10px] mb-6">
