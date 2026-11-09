@@ -19,11 +19,10 @@ import type {DeliveryType, Grade, Sport} from '../../types/listing'
 import {
   deleteListing,
   getListingDetail,
-  isUploadTooLarge,
   updateListing,
-  UPLOAD_TOO_LARGE_NOTICE,
   uploadListingImages,
 } from '../../features/listing/api/listingApi'
+import {isUploadTooLarge, UPLOAD_TOO_LARGE_NOTICE} from '../../lib/upload'
 
 // ── 상수 (ListingCreatePage 와 동일) ─────────────────────────────────────────
 

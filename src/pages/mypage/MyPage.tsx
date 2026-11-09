@@ -68,6 +68,7 @@ import {logout as logoutApi, logoutAll, logoutSession, readSessions} from '../..
 import {getMyTrades} from '../../features/trade/api/tradeApi'
 import type {PostCard} from '../../features/listing/api/listingApi'
 import {getListings, getMyWishes} from '../../features/listing/api/listingApi'
+import {isUploadTooLarge, SINGLE_UPLOAD_TOO_LARGE_NOTICE, UPLOAD_MAX_FILE_BYTES} from '../../lib/upload'
 import {getTradeStatusDisplayLabel} from '../../utils/tradeStatusDisplay'
 
 // ── 공용 상수 ─────────────────────────────────────────────────────────────────
@@ -117,6 +118,7 @@ function ProfileHeader() {
   const qc = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [imgUploading, setImgUploading] = useState(false)
+  const [imgError, setImgError] = useState<string | null>(null)
   // user.id를 queryKey에 포함 → 다른 계정으로 재로그인 시 캐시 충돌 방지
   const {user} = useAuthStore()
   
@@ -137,6 +139,12 @@ function ProfileHeader() {
     const file = e.target.files?.[0]
     if (!file) return
     e.target.value = ''
+    setImgError(null)
+    // 백엔드 업로드 한도(파일 1개 10MB)를 넘으면 보내 봐야 413이므로 바로 안내한다
+    if (file.size > UPLOAD_MAX_FILE_BYTES) {
+      setImgError(SINGLE_UPLOAD_TOO_LARGE_NOTICE)
+      return
+    }
     setImgUploading(true)
     try {
       const url = await uploadProfileImage(file)
@@ -144,6 +152,9 @@ function ProfileHeader() {
       await qc.invalidateQueries({queryKey: ['myProfile']})
     } catch (err) {
       console.error('[프로필 이미지] 업로드 실패:', err)
+      setImgError(isUploadTooLarge(err)
+        ? SINGLE_UPLOAD_TOO_LARGE_NOTICE
+        : '프로필 사진을 바꾸지 못했습니다. 잠시 후 다시 시도해주세요.')
     } finally {
       setImgUploading(false)
     }
@@ -260,6 +271,10 @@ function ProfileHeader() {
           <span className="text-[12px] mt-0.5" style={{color: 'var(--color-text-hint)'}}>매너점수</span>
         </div>
       </div>
+      
+      {imgError && (
+        <p role="alert" className="text-xs mt-3 text-[var(--color-error)]">{imgError}</p>
+      )}
       
       {/* 통계 줄 */}
       <div
