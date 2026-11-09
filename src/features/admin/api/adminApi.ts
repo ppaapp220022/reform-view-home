@@ -18,10 +18,13 @@
  * PATCH /api/admin/withdraw-requests/{withdrawId} — 출금 승인/반려
  * GET   /api/admin/risk/posts           — 위험 게시글 목록 조회
  * GET   /api/admin/risk/chat            — 위험 채팅 목록 조회
+ * POST  /api/admin/embed/posts          — 의미 검색 전체 재임베딩 시작 (202, 실행 중이면 409)
+ * GET   /api/admin/embed/posts          — 재임베딩 진행 상황
  *
  * 회원/게시글/신고 API는 ApiResponse 래퍼 사용,
- * 출금 API는 raw DTO 반환
+ * 출금·재임베딩 API는 raw DTO 반환
  */
+import axios from 'axios'
 import apiClient from '../../../lib/axios'
 import type {PageResponse} from '../../../types/api'
 
@@ -578,4 +581,61 @@ export async function getAdminChatRisks(params?: {
     params: {...params, page: toAdminPageParam(params?.page), size: params?.size ?? 10},
   })
   return data
+}
+
+// ── 의미 검색 재임베딩 API ───────────────────────────────────────────────────────
+
+/** 재임베딩 작업 상태 */
+export type EmbedJobState = 'IDLE' | 'RUNNING' | 'DONE' | 'FAILED'
+
+/**
+ * 재임베딩 진행 상황 (백엔드 PostReembedJob.Status)
+ *  - cleanup: 이전 모델 벡터 삭제 결과나 건너뛴 이유
+ *  - searchCheck: 끝난 뒤 운영 기준값으로 검색해 본 결과
+ *  - note: 상태 자체에 대한 안내 (기록은 서버 메모리에만 있어 재시작하면 IDLE)
+ */
+export interface EmbedJobStatus {
+  state: EmbedJobState
+  total: number
+  processed: number
+  embedded: number
+  failed: number
+  cleanup: string | null
+  searchCheck: string | null
+  lastError: string | null
+  startedAt: string | null
+  finishedAt: string | null
+  note: string | null
+}
+
+/**
+ * 재임베딩 진행 상황
+ * GET /api/admin/embed/posts
+ */
+export async function getEmbedJobStatus(): Promise<EmbedJobStatus> {
+  const {data} = await apiClient.get<EmbedJobStatus>('/admin/embed/posts')
+  return data
+}
+
+/**
+ * 전체 판매글 재임베딩 시작 - 백그라운드로 실행되고 바로 응답한다
+ * POST /api/admin/embed/posts
+ *  - 이미 실행 중이면 409와 함께 현재 상태를 돌려주므로 그 상태를 그대로 쓴다
+ *  - 벡터 저장소가 꺼져 있으면 503
+ */
+export async function startEmbedJob(): Promise<EmbedJobStatus> {
+  try {
+    const {data} = await apiClient.post<EmbedJobStatus>('/admin/embed/posts')
+    return data
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 409 && error.response.data) {
+      return error.response.data as EmbedJobStatus
+    }
+    throw error
+  }
+}
+
+/** 벡터 저장소가 꺼져 있어 재임베딩할 수 없는 오류인지 */
+export function isEmbedUnavailableError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 503
 }

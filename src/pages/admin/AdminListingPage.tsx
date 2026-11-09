@@ -6,6 +6,7 @@
  *   - 신고수 기준 정렬로 위험 게시글 우선 노출
  *   - 숨김(HIDE) / 삭제(DELETE) 조치 + 사유 입력
  *   - 게시글 상세 모달 (내용·이미지·판매자 정보)
+ *   - 의미 검색 전체 재임베딩 (SearchEmbeddingPanel)
  */
 import {useState} from 'react'
 import {Link} from 'react-router-dom'
@@ -26,6 +27,7 @@ import {
 import type {PostStatus, Sport} from '../../features/admin/api/adminApi'
 import {getAdminPost, getAdminPosts, processAdminPost,} from '../../features/admin/api/adminApi'
 import {formatPrice} from '../../utils/format'
+import SearchEmbeddingPanel from '../../features/admin/components/SearchEmbeddingPanel'
 
 // ── 상수 ─────────────────────────────────────────────────────────────────────
 
@@ -376,6 +378,9 @@ export default function AdminListingPage() {
           </p>
         </div>
       </div>
+      
+      {/* 의미 검색 재임베딩 */}
+      <SearchEmbeddingPanel/>
       
       {/* 필터 바 */}
       <div className="flex flex-wrap gap-3 mb-5">
