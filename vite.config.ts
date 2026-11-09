@@ -34,6 +34,12 @@ export default defineConfig({
       },
       // 업로드 이미지 서빙 — 백엔드 Spring MVC resource handler
       // 이미지 URL이 /uploads/post/... or /uploads/member/... 형태로 반환됨
+      // STOMP 웹소켓 (채팅·알림·거래 실시간) - VITE_WS_BASE_URL이 없으면 현재 주소(5173)로 붙으므로 백엔드로 넘긴다
+      '/stomp': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        ws: true,
+      },
       '/uploads': {
         target: 'http://localhost:8080',
         changeOrigin: true,

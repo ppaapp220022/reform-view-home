@@ -298,8 +298,9 @@ export default function LoginPage() {
     )
   }
 
+  // 공개 사이트에 노출되는 계정이므로 관리자 대신 일반 회원(USER) 더미 계정을 쓴다
   function applyDummyAccount() {
-    setEmail('admin@reform.com')
+    setEmail('user001@reform.com')
     setPassword('1234')
     setStep1Error(null)
   }
@@ -433,7 +434,7 @@ export default function LoginPage() {
                   className="font-medium text-[var(--color-text-sub)]"
                   style={{fontFamily: "'Pretendard',Giants,sans-serif"}}
                 >
-                  admin@reform.com
+                  user001@reform.com
                 </span>
               </p>
               <p className="text-[var(--color-text-hint)]">

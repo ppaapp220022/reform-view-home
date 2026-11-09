@@ -19,23 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build frontend
-        run: npm run build
-        env:
-          VITE_API_BASE_URL: /api
-          VITE_WS_BASE_URL: ''
-          VITE_TOSS_CLIENT_KEY: ${{ secrets.VITE_TOSS_CLIENT_KEY }}
-          VITE_TOSS_MOCK: ${{ vars.VITE_TOSS_MOCK }}
-
+      # 설치·빌드는 Dockerfile 안에서 한다 (러너에서도 빌드하면 같은 일을 두 번 했다)
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
