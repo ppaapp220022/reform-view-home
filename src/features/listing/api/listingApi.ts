@@ -13,7 +13,6 @@
  *
  * 응답은 ApiResponse<T> 래퍼 — axios 인터셉터에서 자동 언래핑
  */
-import axios from 'axios'
 import apiClient from '../../../lib/axios'
 import type {PageResponse} from '../../../types/api'
 import type {DeliveryType, Grade, PostStatus, RiskLevel, Sport} from '../../../types/listing'
@@ -177,17 +176,6 @@ export async function getListingDetail(postId: number): Promise<PostDetail> {
  * @param files 업로드할 이미지 파일 목록
  * @returns 업로드된 이미지 URL 목록
  */
-/**
- * 업로드 용량 초과 안내. 백엔드 spring.servlet.multipart 한도(파일 1개 10MB, 요청 전체 30MB)를 넘으면 413을 돌려준다.
- * 다시 시도해도 같은 결과이므로 "잠시 후 다시 시도" 대신 사진 크기를 줄이도록 안내한다.
- */
-export const UPLOAD_TOO_LARGE_NOTICE = '사진 용량이 너무 커요. 사진 1장은 10MB, 한 번에 올리는 사진은 합쳐서 30MB 이하로 올려주세요.'
-
-/** 이미지 업로드가 용량 한도 때문에 거절됐는지 */
-export function isUploadTooLarge(error: unknown): boolean {
-  return axios.isAxiosError(error) && error.response?.status === 413
-}
-
 export async function uploadListingImages(files: File[]): Promise<string[]> {
   const fd = new FormData()
   files.forEach((file) => fd.append('images', file))
