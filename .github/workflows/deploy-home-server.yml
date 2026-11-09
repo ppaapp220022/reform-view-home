@@ -1,0 +1,73 @@
+name: Deploy Frontend To Home Server
+
+on:
+  # PR은 master로 머지한다 - 배포도 master에서 (전에는 main에서만 돌아 master에 머지한 PR이 운영에 안 올라갔다)
+  push:
+    branches: [ master ]
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/reform-view-home
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-22.04
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # 설치·빌드는 Dockerfile 안에서 한다 (러너에서도 빌드하면 같은 일을 두 번 했다)
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          build-args: |
+            VITE_API_BASE_URL=/api
+            VITE_WS_BASE_URL=
+            VITE_TOSS_CLIENT_KEY=${{ secrets.VITE_TOSS_CLIENT_KEY }}
+            VITE_TOSS_MOCK=${{ vars.VITE_TOSS_MOCK }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    # 러너에 쌓인 옛 배포가 나중에 돌면서 최신 이미지를 덮어쓰지 않도록 최신 런만 남긴다
+    concurrency:
+      group: deploy-frontend
+      cancel-in-progress: true
+    runs-on: [self-hosted, Linux, X64, reform-view]
+
+    permissions:
+      contents: read
+      packages: read
+
+    env:
+      DEPLOY_PATH: /srv/docker/reform
+
+    steps:
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Deploy frontend
+        env:
+          # 방금 build-and-push가 올린 이미지를 그대로 쓴다. 셸 환경변수가 .env보다 우선하므로
+          # 서버 .env의 FRONTEND_IMAGE가 옛 주소(예: 계정 이름 변경 전)여도 영향받지 않는다.
+          FRONTEND_IMAGE: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+        run: |
+          cd "$DEPLOY_PATH"
+          docker compose --env-file .env pull frontend
+          # frontend는 depends_on: backend라서 --no-deps 없이 올리면 backend가 .env의 BACKEND_IMAGE로 재생성된다
+          docker compose --env-file .env up -d --no-deps frontend

@@ -297,6 +297,13 @@ export default function LoginPage() {
       {onError: (err) => setStep2Error(parseStep2Error(err))},
     )
   }
+
+  // 공개 사이트에 노출되는 계정이므로 관리자 대신 일반 회원(USER) 더미 계정을 쓴다
+  function applyDummyAccount() {
+    setEmail('user001@reform.com')
+    setPassword('1234')
+    setStep1Error(null)
+  }
   
   return (
     <div
@@ -403,23 +410,31 @@ export default function LoginPage() {
             </p>
             
             {/* 포트폴리오용 테스트 계정 안내 */}
-            <div
-              className="mb-6 px-4 py-3 rounded-[10px] border text-[13px] leading-relaxed"
+            <button
+              type="button"
+              onClick={applyDummyAccount}
+              className="mb-6 w-full text-left px-4 py-3 rounded-[10px] border text-[13px] leading-relaxed transition-colors hover:bg-[rgba(0,33,71,0.09)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2"
               style={{
                 background: 'rgba(0,33,71,0.06)',
                 borderColor: 'var(--color-border)',
               }}
+              aria-label="테스트 계정 정보 자동 입력"
             >
-              <p className="font-medium text-[var(--color-text-sub)] mb-1">
-                테스트 계정
-              </p>
+              <div className="flex items-center justify-between gap-3 mb-1">
+                <p className="font-medium text-[var(--color-text-sub)]">
+                  테스트 계정
+                </p>
+                <span className="text-[12px] font-medium text-[var(--color-primary)]">
+                  클릭해서 자동 입력
+                </span>
+              </div>
               <p className="text-[var(--color-text-hint)]">
                 이메일:{' '}
                 <span
                   className="font-medium text-[var(--color-text-sub)]"
                   style={{fontFamily: "'Pretendard',Giants,sans-serif"}}
                 >
-                  admin@reform.com
+                  user001@reform.com
                 </span>
               </p>
               <p className="text-[var(--color-text-hint)]">
@@ -431,7 +446,10 @@ export default function LoginPage() {
                   1234
                 </span>
               </p>
-            </div>
+              <p className="mt-2 text-[12px] text-[var(--color-text-hint)]">
+                테스트용 계정을 빠르게 채워 넣습니다.
+              </p>
+            </button>
             
             {/* 소셜 로그인 버튼 */}
             <div className="flex flex-col gap-[10px] mb-6">
