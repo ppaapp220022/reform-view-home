@@ -1,0 +1,52 @@
+# 머지 전 검사. 배포(deploy-home-server.yml)는 master push에서만 돌아 빌드 실패를 머지한 뒤에야 알았다
+# (예: 이미지의 npm ci가 lock 파일과 맞지 않아 첫 master 배포 실패)
+name: checks
+
+on:
+  # 백엔드 checks와 같이 브랜치 push 기준으로 돌린다. 결과가 커밋에 붙어 PR 체크로도 보인다
+  #  - master는 PR 브랜치에서 이미 검사했고 배포가 같은 이미지를 빌드하므로 뺀다
+  push:
+    branches-ignore: [ master ]
+  workflow_dispatch:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # lint(오류만 실패, 경고는 통과). 타입 검사·빌드는 docker 작업의 Dockerfile(npm run build = tsc -b + vite)이 한다
+  checks:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # 배포 이미지(Dockerfile)와 같은 npm 메이저로 설치해 lock 파일 처리 차이를 같이 잡는다
+      - name: Install
+        run: npm install -g npm@11 && npm ci
+
+      - name: Lint
+        run: npm run lint -- --quiet
+
+  # 배포와 같은 Dockerfile로 이미지가 만들어지는지 (push는 하지 않는다)
+  docker:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

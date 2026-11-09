@@ -12,7 +12,7 @@
  */
 import {Link, useParams} from 'react-router-dom'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {useEffect, useState} from 'react'
+import {useState} from 'react'
 import {
   AlertCircle,
   AlertTriangle,
@@ -158,9 +158,14 @@ export default function AdminReportDetailPage() {
    * 백엔드가 저장한 관리자 메모를 그대로 다시 보여주고,
    * 미처리 상태에서는 초기값으로 불러와 추가 편집도 가능하게 한다.
    */
-  useEffect(() => {
+  // 신고나 저장된 메모가 바뀌면 렌더 중에 입력값을 맞춘다 (effect 안 setState는 렌더를 한 번 더 일으킨다)
+  //  - 처음 값은 null: 캐시에 있던 신고를 다시 열어 첫 렌더부터 데이터가 있어도 한 번은 맞춘다
+  const memoSource = `${report?.reportId}:${report?.adminMemo ?? ''}`
+  const [syncedMemoSource, setSyncedMemoSource] = useState<string | null>(null)
+  if (syncedMemoSource !== memoSource) {
+    setSyncedMemoSource(memoSource)
     setAdminMemo(report?.adminMemo ?? '')
-  }, [report?.reportId, report?.adminMemo])
+  }
 
   const processMutation = useMutation({
     mutationFn: (request: { action: Exclude<ReportStatus, 'PENDING'>; adminMemo?: string }) =>
