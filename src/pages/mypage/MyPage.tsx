@@ -67,7 +67,8 @@ import type {AuthSession} from '../../features/auth/api/authApi'
 import {logout as logoutApi, logoutAll, logoutSession, readSessions} from '../../features/auth/api/authApi'
 import {getMyTrades} from '../../features/trade/api/tradeApi'
 import type {PostCard} from '../../features/listing/api/listingApi'
-import {getListings, getMyWishes, isUploadTooLarge} from '../../features/listing/api/listingApi'
+import {getListings, getMyWishes} from '../../features/listing/api/listingApi'
+import {isUploadTooLarge, SINGLE_UPLOAD_TOO_LARGE_NOTICE, UPLOAD_MAX_FILE_BYTES} from '../../lib/upload'
 import {getTradeStatusDisplayLabel} from '../../utils/tradeStatusDisplay'
 
 // ── 공용 상수 ─────────────────────────────────────────────────────────────────
@@ -102,10 +103,6 @@ const TRADE_STATUS_META: Partial<Record<TradeStatus, { label: string; color: str
   CANCELED: {label: '취소됨', color: 'var(--color-accent)'},
   DISPUTED: {label: '분쟁중', color: 'var(--color-accent)'},
 }
-
-// 프로필 사진 용량 한도 - 백엔드 spring.servlet.multipart.max-file-size(10MB)와 같다
-const PROFILE_IMAGE_MAX_BYTES = 10 * 1024 * 1024
-const PROFILE_IMAGE_TOO_LARGE_NOTICE = '사진 용량이 너무 커요. 10MB 이하 사진으로 올려주세요.'
 
 function mannerColor(score: number) {
   if (score >= 90) return 'var(--color-success)'
@@ -144,8 +141,8 @@ function ProfileHeader() {
     e.target.value = ''
     setImgError(null)
     // 백엔드 업로드 한도(파일 1개 10MB)를 넘으면 보내 봐야 413이므로 바로 안내한다
-    if (file.size > PROFILE_IMAGE_MAX_BYTES) {
-      setImgError(PROFILE_IMAGE_TOO_LARGE_NOTICE)
+    if (file.size > UPLOAD_MAX_FILE_BYTES) {
+      setImgError(SINGLE_UPLOAD_TOO_LARGE_NOTICE)
       return
     }
     setImgUploading(true)
@@ -156,7 +153,7 @@ function ProfileHeader() {
     } catch (err) {
       console.error('[프로필 이미지] 업로드 실패:', err)
       setImgError(isUploadTooLarge(err)
-        ? PROFILE_IMAGE_TOO_LARGE_NOTICE
+        ? SINGLE_UPLOAD_TOO_LARGE_NOTICE
         : '프로필 사진을 바꾸지 못했습니다. 잠시 후 다시 시도해주세요.')
     } finally {
       setImgUploading(false)

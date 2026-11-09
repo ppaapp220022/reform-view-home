@@ -16,10 +16,9 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {deletePostDraft, type DraftModeration, getPostDraft, savePostDraft,} from '../../features/listing/api/draftApi'
 import {
   createListing,
-  isUploadTooLarge,
-  UPLOAD_TOO_LARGE_NOTICE,
   uploadListingImages,
 } from '../../features/listing/api/listingApi'
+import {isUploadTooLarge, UPLOAD_TOO_LARGE_NOTICE} from '../../lib/upload'
 import {type AiSuggestion, type AiSuggestState, useAiSuggest} from '../../features/listing/hooks/useAiSuggest'
 import useMediaQuery from '../../hooks/useMediaQuery'
 import {flattenImageToWhite, resolveImageUrl} from '../../utils/image'
