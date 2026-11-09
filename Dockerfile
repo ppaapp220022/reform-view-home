@@ -4,7 +4,8 @@ WORKDIR /app
 
 COPY package*.json ./
 # lock 파일 그대로 설치 (npm install은 다른 버전을 받을 수 있다)
-RUN npm ci
+# 이미지 기본 npm(10)과 로컬 npm(11)은 선택적 peer를 lock에 다르게 적어 npm ci가 실패했다 → 로컬과 같은 메이저로 맞춘다
+RUN npm install -g npm@11 && npm ci
 
 COPY . .
 
