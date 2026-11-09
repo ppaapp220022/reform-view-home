@@ -32,6 +32,7 @@ import type {PostCard} from '../../features/listing/api/listingApi'
 import {getListings, getPopularListings, toggleWish} from '../../features/listing/api/listingApi'
 import type {RecommendPostCard} from '../../features/recommendation/api/recommendationApi'
 import {getRecommendations} from '../../features/recommendation/api/recommendationApi'
+import useAuthStore from '../../store/authStore'
 import {resolveImageUrl} from '../../utils/image'
 import ConditionBadge from '../../components/ui/ConditionBadge'
 import type {DeliveryType, Grade, Sport} from '../../types/listing'
@@ -471,6 +472,7 @@ export default function SearchPage() {
   
   
   const isAiMode = sort === 'ai_recommend'
+  const currentUserId = useAuthStore((s) => s.user?.id ?? null)
 
   /* API — 일반 검색/필터 목록 */
   const {data, isLoading, isError} = useQuery({
@@ -497,10 +499,11 @@ export default function SearchPage() {
     isLoading: aiLoading,
     isError: aiError,
   } = useQuery({
-    queryKey: ['aiRecommendations'],
+    // 추천 결과는 로그인 회원마다 다르고 비로그인 시 빈 목록이므로, 사용자가 바뀌면 캐시를 따로 쓴다
+    queryKey: ['aiRecommendations', currentUserId],
     queryFn: () => getRecommendations(20),
     enabled: isAiMode, // AI 추천 버튼 클릭 시만 호출
-    staleTime: 60_000, // 1분 캐시 (임베딩 기반이라 자주 바뀌지 않음)
+    staleTime: 60_000, // 1분 캐시 (현재 백엔드는 인기 게시글 기반이라 자주 바뀌지 않음)
   })
 
   /* 사이즈 필터는 API 미지원 → 클라이언트 측 필터링 */

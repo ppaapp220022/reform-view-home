@@ -13,6 +13,7 @@
  *
  * 응답은 ApiResponse<T> 래퍼 — axios 인터셉터에서 자동 언래핑
  */
+import axios from 'axios'
 import apiClient from '../../../lib/axios'
 import type {PageResponse} from '../../../types/api'
 import type {DeliveryType, Grade, PostStatus, RiskLevel, Sport} from '../../../types/listing'
@@ -176,6 +177,17 @@ export async function getListingDetail(postId: number): Promise<PostDetail> {
  * @param files 업로드할 이미지 파일 목록
  * @returns 업로드된 이미지 URL 목록
  */
+/**
+ * 업로드 용량 초과 안내. 백엔드 spring.servlet.multipart 한도(파일 1개 10MB, 요청 전체 30MB)를 넘으면 413을 돌려준다.
+ * 다시 시도해도 같은 결과이므로 "잠시 후 다시 시도" 대신 사진 크기를 줄이도록 안내한다.
+ */
+export const UPLOAD_TOO_LARGE_NOTICE = '사진 용량이 너무 커요. 사진 1장은 10MB, 한 번에 올리는 사진은 합쳐서 30MB 이하로 올려주세요.'
+
+/** 이미지 업로드가 용량 한도 때문에 거절됐는지 */
+export function isUploadTooLarge(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 413
+}
+
 export async function uploadListingImages(files: File[]): Promise<string[]> {
   const fd = new FormData()
   files.forEach((file) => fd.append('images', file))
@@ -242,22 +254,47 @@ export async function getMyWishes(): Promise<PostCard[]> {
 // ── AI 판매글 도우미 API ──────────────────────────────────────────────────────
 
 /**
+ * AI 추천 결과 상태
+ * - OK: 제목·설명 추천 있음
+ * - NO_PRODUCT: 사진에서 판매할 상품을 찾지 못함
+ * - FAILED: AI 호출·응답 파싱 실패
+ */
+export type AiSuggestStatus = 'OK' | 'NO_PRODUCT' | 'FAILED'
+
+/**
+ * AI 추천 요청 타임아웃. 백엔드 OpenAI 호출 타임아웃(Spring AI 기본 60초, application.properties에 별도 설정 없음)보다
+ * 길어야 서버가 먼저 FAILED를 돌려줄 수 있다. 백엔드 값을 바꾸면 VITE_AI_SUGGEST_TIMEOUT_MS로 함께 조정한다.
+ */
+const AI_SUGGEST_TIMEOUT_MS = Number(import.meta.env.VITE_AI_SUGGEST_TIMEOUT_MS) || 70_000
+
+export interface AiSuggestResult {
+  title: string
+  description: string
+  /** 이전 백엔드 응답에는 없으므로 optional */
+  status?: AiSuggestStatus
+}
+
+/**
  * AI 판매글 제목/설명 자동 제안
  * POST /api/listings/ai-suggest (multipart/form-data)
  *
  * 이미지 파일을 업로드하면 Spring AI가 판매글 제목과 설명을 자동 추천
  * @param image 분석할 이미지 파일 (첫 번째 사진 권장)
- * @returns { title: string, description: string }
+ * @param signal 사진 교체·화면 이탈 시 요청을 취소하기 위한 AbortSignal
+ * @returns { title, description, status }
+ *   status가 'OK'가 아니면 title·description은 빈 문자열이므로 폼에 적용하지 않는다
  */
 export async function suggestListingFromImage(
   image: File,
-): Promise<{ title: string; description: string }> {
+  signal?: AbortSignal,
+): Promise<AiSuggestResult> {
   const formData = new FormData()
   formData.append('image', image)
-  const {data} = await apiClient.post<{ title: string; description: string }>(
+  const {data} = await apiClient.post<AiSuggestResult>(
     '/listings/ai-suggest',
     formData,
-    {headers: {'Content-Type': 'multipart/form-data'}},
+    // Vision 분석은 15초 안팎 걸려 기본 10초 타임아웃을 넘기므로 전용 타임아웃을 쓴다
+    {headers: {'Content-Type': 'multipart/form-data'}, timeout: AI_SUGGEST_TIMEOUT_MS, signal},
   )
   return data
 }
