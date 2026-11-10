@@ -81,6 +81,8 @@ export interface PostDetail {
 
 // ── 요청 타입 ─────────────────────────────────────────────────────────────────
 
+export type ListingSort = 'latest' | 'price_asc' | 'price_desc' | 'popular'
+
 /** 판매글 목록 조회 파라미터 */
 export interface ListingQueryParams {
   sport?: Sport
@@ -89,8 +91,8 @@ export interface ListingQueryParams {
   condition?: Grade          // 컨디션 필터 (Grade 기준)
   minPrice?: number          // 최소 가격 필터
   maxPrice?: number          // 최대 가격 필터
-  sort?: 'latest' | 'price_asc' | 'price_desc' | 'popular' | 'ai_recommend'
-  page?: number              // 0-based
+  sort?: ListingSort         // 없으면 검색어 검색은 관련도순, 목록은 최신순
+  page?: number              // 0-based (getListings가 백엔드의 1-based로 바꿔 보냄)
   size?: number
 }
 
@@ -155,7 +157,9 @@ export interface WishToggleResponse {
 export async function getListings(
   params?: ListingQueryParams,
 ): Promise<PageResponse<PostCard>> {
-  const {data} = await apiClient.get<PageResponse<PostCard>>('/listings', {params})
+  // 백엔드 page는 1부터 (0과 1이 같은 페이지) → 화면의 0-based page를 1-based로 바꿔 보낸다
+  const page = params?.page ?? 0
+  const {data} = await apiClient.get<PageResponse<PostCard>>('/listings', {params: {...params, page: page + 1}})
   return data
 }
 

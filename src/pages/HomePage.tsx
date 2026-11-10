@@ -125,7 +125,7 @@ function ProductCard({
           <div className="flex items-center justify-between mt-2">
             <span
               className="font-bold text-sm"
-              style={{color: 'var(--color-primary)', fontFamily: "'IAMAPLAYER',Giants,sans-serif"}}
+              style={{color: 'var(--color-price)', fontFamily: "'IAMAPLAYER',Giants,sans-serif"}}
             >
               {formatPrice(item.price)}
             </span>
