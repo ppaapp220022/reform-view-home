@@ -91,6 +91,7 @@ export interface ListingQueryParams {
   condition?: Grade          // 컨디션 필터 (Grade 기준)
   minPrice?: number          // 최소 가격 필터
   maxPrice?: number          // 최대 가격 필터
+  itemSize?: string          // 사이즈 필터 (XS·S·M·L·XL·XXL) - size는 페이지 크기라 이름이 다름
   sort?: ListingSort         // 없으면 검색어 검색은 관련도순, 목록은 최신순
   page?: number              // 0-based (getListings가 백엔드의 1-based로 바꿔 보냄)
   size?: number
