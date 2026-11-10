@@ -541,7 +541,8 @@ function GnbSearchBar() {
   }
   
   return (
-    <div ref={containerRef} className="relative flex-1" style={{maxWidth: 360}}>
+    // md~lg(768~1023px)에선 메뉴·버튼과 한 줄에 들어가지 않아 숨긴다 (검색 화면에 자체 검색창이 있음)
+    <div ref={containerRef} className="relative flex-1 min-w-0 hidden lg:block" style={{maxWidth: 360}}>
       {/* 검색 입력창 */}
       <form
         onSubmit={handleSubmit}
@@ -766,7 +767,7 @@ export default function GNB() {
       </div>
       
       {/* ── 데스크톱 헤더 ────────────────────────────────────────────────── */}
-      <div className="hidden md:flex items-center max-w-[1280px] mx-auto px-7 py-[14px] gap-7">
+      <div className="hidden md:flex items-center max-w-[1280px] mx-auto px-4 lg:px-7 py-[14px] gap-4 lg:gap-7">
         
         {/* 로고 */}
         <Link to="/" className="inline-flex items-center shrink-0" aria-label="RE:FORM 홈">
@@ -774,7 +775,7 @@ export default function GNB() {
         </Link>
         
         {/* 메인 네비게이션 */}
-        <nav className="flex gap-1">
+        <nav className="flex gap-1 shrink-0">
           {NAV_ITEMS.map(({id, label, path}) => {
             const isActive = activeId === id
             return (
@@ -782,7 +783,7 @@ export default function GNB() {
                 key={id}
                 to={path}
                 className={[
-                  'relative px-[14px] py-2 rounded-lg text-sm font-display no-underline transition-colors',
+                  'relative px-[10px] lg:px-[14px] py-2 rounded-lg text-sm font-display no-underline whitespace-nowrap transition-colors',
                   isActive
                     ? 'text-[var(--color-accent)] font-bold hover:text-[var(--color-accent)]'
                     : 'text-[var(--color-text-sub)] font-semibold hover:text-[var(--color-accent)]',
@@ -791,7 +792,7 @@ export default function GNB() {
                 {label}
                 {isActive && (
                   <span
-                    className="absolute left-[14px] right-[14px] -bottom-[15px] h-0.5 bg-[var(--color-accent)] rounded-sm"/>
+                    className="absolute left-[10px] right-[10px] lg:left-[14px] lg:right-[14px] -bottom-[15px] h-0.5 bg-[var(--color-accent)] rounded-sm"/>
                 )}
               </Link>
             )
@@ -802,7 +803,7 @@ export default function GNB() {
         <GnbSearchBar/>
         
         {/* 우측 액션 영역 — 채팅·마이페이지는 nav로 이동, 알림만 아이콘 유지 */}
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-2 ml-auto shrink-0">
           {/* 알림 버튼 (드롭다운 포함) */}
           <NotificationButton/>
           
@@ -812,7 +813,7 @@ export default function GNB() {
           ) : (
             <Link
               to="/login"
-              className="ml-1 text-sm font-display font-semibold no-underline text-[var(--color-text-main)] hover:text-[var(--color-accent)] transition-colors"
+              className="ml-1 text-sm font-display font-semibold no-underline whitespace-nowrap text-[var(--color-text-main)] hover:text-[var(--color-accent)] transition-colors"
             >
               로그인
             </Link>

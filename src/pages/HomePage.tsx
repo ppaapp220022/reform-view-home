@@ -475,7 +475,7 @@ export default function HomePage() {
   /* ── 필터 상태 (SearchPage와 동일한 개별 state 방식) ── */
   const [sport, setSport] = useState<Sport | 'all'>('all')
   const [grade, setGrade] = useState<Grade | 'all'>('all')
-  const [size, setSize] = useState('전체')              // 클라이언트 측 필터링
+  const [size, setSize] = useState('전체')
   const [delivery, setDelivery] = useState<DeliveryType | 'all'>('all')
   const [maxPrice, setMaxPrice] = useState(300)         // 슬라이더: 10~300 (×1000원)
   const [sort, setSort] = useState<'latest' | 'price_asc' | 'price_desc' | 'popular' | 'ai_recommend'>('latest')
@@ -531,6 +531,7 @@ export default function HomePage() {
     condition: grade !== 'all' ? grade : undefined,
     tradeType: delivery !== 'all' ? delivery : undefined,
     maxPrice: maxPrice < 300 ? maxPrice * 1000 : undefined,
+    itemSize: size !== '전체' ? size : undefined,
     // 'ai_recommend' 선택 시 백엔드 popular 폴백 (백엔드 구현 후 직접 전달 예정)
     sort: sort === 'ai_recommend' ? 'popular' : sort,
     page,
@@ -553,11 +554,9 @@ export default function HomePage() {
     placeholderData: prev => prev,   // 필터 바뀌어도 이전 결과 유지
   })
   
-  /* ── 사이즈 클라이언트 필터 + 찜 오버라이드 병합 ── */
+  /* ── 목록 (사이즈는 서버에서 걸러 옴) ── */
   const allItems: PostCard[] = data?.content ?? []
-  const results: PostCard[] = size !== '전체'
-    ? allItems.filter(item => item.size === size)
-    : allItems
+  const results: PostCard[] = allItems
   
   const totalPages = data?.totalPages ?? 1
   

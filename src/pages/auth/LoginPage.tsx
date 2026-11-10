@@ -11,7 +11,7 @@
  *       Step 1) 이메일+비밀번호 제출 → 이메일로 6자리 코드 발송
  *       Step 2) 인증코드 입력 → JWT 발급 → 홈 이동
  */
-import {type FormEvent, type KeyboardEvent, useRef, useState} from 'react'
+import {type ClipboardEvent, type FormEvent, type KeyboardEvent, useRef, useState} from 'react'
 import {Link} from 'react-router-dom'
 import {AlertCircle, CreditCard, Eye, EyeOff, Mail, ShieldCheck, Sparkles} from 'lucide-react'
 import {useLogin} from '../../features/auth/hooks/useLogin'
@@ -108,14 +108,41 @@ function CodeForm({email, onSubmit, isPending, errorMessage, onBack, verificatio
   const [digits, setDigits] = useState<string[]>(Array(6).fill(''))
   const refs = useRef<(HTMLInputElement | null)[]>([])
   
+  /* idx 칸부터 숫자를 차례로 채우고 마지막으로 채운 다음 칸(없으면 마지막 칸)으로 포커스 */
+  function fillFrom(idx: number, numbers: string) {
+    const next = [...digits]
+    const chars = numbers.slice(0, 6 - idx).split('')
+    chars.forEach((c, k) => {
+      next[idx + k] = c
+    })
+    setDigits(next)
+    refs.current[Math.min(idx + chars.length, 5)]?.focus()
+  }
+
   function handleInput(idx: number, val: string) {
     // 숫자만 허용
-    const digit = val.replace(/\D/g, '').slice(-1)
+    const numbers = val.replace(/\D/g, '')
+    // 휴대폰 문자 자동 입력(one-time-code)처럼 한 칸에 여러 자리가 들어오면 이어지는 칸에 나눠 넣는다
+    // 단 이미 숫자가 있는 칸에 한 자리를 더 치면(기존+새 숫자 2자리) 새 숫자로 바꾼다
+    const isOverwrite = numbers.length === 2 && digits[idx] !== '' && numbers.startsWith(digits[idx])
+    if (numbers.length > 1 && !isOverwrite) {
+      fillFrom(idx, numbers)
+      return
+    }
+    const digit = numbers.slice(-1)
     const next = [...digits]
     next[idx] = digit
     setDigits(next)
     // 다음 칸으로 자동 포커스
     if (digit && idx < 5) refs.current[idx + 1]?.focus()
+  }
+
+  // 메일에서 복사한 코드를 붙여넣으면 첫 칸에만 들어가지 않고 6칸에 나눠 넣는다
+  function handlePaste(idx: number, e: ClipboardEvent<HTMLInputElement>) {
+    const numbers = e.clipboardData.getData('text').replace(/\D/g, '')
+    if (!numbers) return
+    e.preventDefault()
+    fillFrom(idx, numbers)
   }
   
   function handleKeyDown(idx: number, e: KeyboardEvent<HTMLInputElement>) {
@@ -193,10 +220,11 @@ function CodeForm({email, onSubmit, isPending, errorMessage, onBack, verificatio
             }}
             type="text"
             inputMode="numeric"
-            maxLength={1}
+            autoComplete={i === 0 ? 'one-time-code' : 'off'}
             value={d}
             onChange={(e) => handleInput(i, e.target.value)}
             onKeyDown={(e) => handleKeyDown(i, e)}
+            onPaste={(e) => handlePaste(i, e)}
             className="w-11 h-14 text-center text-[22px] font-medium rounded-[10px] border transition-colors
               bg-[var(--color-surface)] text-[var(--color-text-main)]
               border-[var(--color-border)] focus:border-[var(--color-accent)] outline-none"

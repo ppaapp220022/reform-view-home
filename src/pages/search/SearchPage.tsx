@@ -491,13 +491,14 @@ export default function SearchPage() {
 
   /* API — 일반 검색/필터 목록 */
   const {data, isLoading, isError} = useQuery({
-    queryKey: ['searchListings', query, sport, grade, delivery, maxPrice, activeSort, page],
+    queryKey: ['searchListings', query, sport, grade, size, delivery, maxPrice, activeSort, page],
     queryFn: () =>
       getListings({
         keyword: query || undefined,
         sport: sport !== 'all' ? sport : undefined,
         condition: grade !== 'all' ? grade : undefined,
         tradeType: delivery !== 'all' ? delivery : undefined,
+        itemSize: size !== '전체' ? size : undefined,
         maxPrice: maxPrice < 300 ? maxPrice * 1000 : undefined,
         sort: activeSort === 'relevance' || activeSort === 'ai_recommend' ? undefined : activeSort,
         page,
@@ -521,11 +522,9 @@ export default function SearchPage() {
     staleTime: 60_000, // 1분 캐시 (현재 백엔드는 인기 게시글 기반이라 자주 바뀌지 않음)
   })
 
-  /* 사이즈 필터는 API 미지원 → 클라이언트 측 필터링 */
+  /* 사이즈는 서버에서 걸러 온다 (AI 추천은 사이즈 필터 미적용) */
   const allItems = isAiMode ? (aiData ?? []) : (data?.content ?? [])
-  const results = isAiMode
-    ? allItems  // AI 추천은 사이즈 필터 미적용
-    : (size !== '전체' ? (allItems as PostCard[]).filter(item => item.size === size) : allItems)
+  const results = allItems
 
   const totalPages = isAiMode ? 1 : (data?.totalPages ?? 1)
   const activeIsLoading = isAiMode ? aiLoading : isLoading
