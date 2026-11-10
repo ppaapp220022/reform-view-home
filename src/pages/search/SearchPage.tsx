@@ -466,6 +466,16 @@ export default function SearchPage() {
   const [maxPrice, setMaxPrice] = useState(300)
   const [sort, setSort] = useState<SearchSort>(initialQuery ? 'relevance' : 'latest')
   const [page, setPage] = useState(0) // 0-based 페이지
+
+  /* 이 화면에 있는 채로 GNB에서 새로 검색하면 같은 라우트라 다시 마운트되지 않으므로, URL의 q가 바뀌면 새 검색으로 맞춘다 */
+  const [urlQuery, setUrlQuery] = useState(initialQuery)
+  if (initialQuery !== urlQuery) {
+    setUrlQuery(initialQuery)
+    setQuery(initialQuery)
+    setInputVal(initialQuery)
+    setSort(initialQuery ? 'relevance' : 'latest')
+    setPage(0)
+  }
   
   /* 모바일 필터 드로어 */
   const [filterOpen, setFilterOpen] = useState(false)
