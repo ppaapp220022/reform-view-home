@@ -123,15 +123,18 @@ function CodeForm({email, onSubmit, isPending, errorMessage, onBack, verificatio
     // 숫자만 허용
     const numbers = val.replace(/\D/g, '')
     // 휴대폰 문자 자동 입력(one-time-code)처럼 한 칸에 여러 자리가 들어오면 이어지는 칸에 나눠 넣는다
-    if (numbers.length > 1) {
+    // 단 이미 숫자가 있는 칸에 한 자리를 더 치면(기존+새 숫자 2자리) 새 숫자로 바꾼다
+    const isOverwrite = numbers.length === 2 && digits[idx] !== '' && numbers.startsWith(digits[idx])
+    if (numbers.length > 1 && !isOverwrite) {
       fillFrom(idx, numbers)
       return
     }
+    const digit = numbers.slice(-1)
     const next = [...digits]
-    next[idx] = numbers
+    next[idx] = digit
     setDigits(next)
     // 다음 칸으로 자동 포커스
-    if (numbers && idx < 5) refs.current[idx + 1]?.focus()
+    if (digit && idx < 5) refs.current[idx + 1]?.focus()
   }
 
   // 메일에서 복사한 코드를 붙여넣으면 첫 칸에만 들어가지 않고 6칸에 나눠 넣는다
