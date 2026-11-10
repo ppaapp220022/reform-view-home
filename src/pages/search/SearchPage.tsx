@@ -28,7 +28,7 @@ import {
 } from 'lucide-react'
 import Pagination from '../../components/ui/Pagination'
 import {useQuery} from '@tanstack/react-query'
-import type {PostCard} from '../../features/listing/api/listingApi'
+import type {ListingSort, PostCard} from '../../features/listing/api/listingApi'
 import {getListings, getPopularListings, toggleWish} from '../../features/listing/api/listingApi'
 import type {RecommendPostCard} from '../../features/recommendation/api/recommendationApi'
 import {getRecommendations} from '../../features/recommendation/api/recommendationApi'
@@ -64,7 +64,10 @@ const DELIVERY_OPTIONS: { key: DeliveryType | 'all'; label: string }[] = [
   {key: 'DIRECT', label: '직거래'},
   {key: 'BOTH', label: '모두 가능'},
 ]
-const SORT_OPTIONS = [
+// relevance는 검색어가 있을 때만 보이며, 백엔드에 sort를 보내지 않으면 관련도순(의미 검색 + 재정렬)이 된다
+type SearchSort = ListingSort | 'relevance' | 'ai_recommend'
+const SORT_OPTIONS: { key: SearchSort; label: string }[] = [
+  {key: 'relevance', label: '관련도순'},
   {key: 'latest', label: '최신순'},
   {key: 'popular', label: '인기순'},
   {key: 'price_asc', label: '낮은가격'},
@@ -197,7 +200,7 @@ function PopularSection({
                 </p>
                 <p
                   className="text-xs font-bold mt-1"
-                  style={{color: 'var(--color-primary)', fontFamily: "'IAMAPLAYER',Giants,sans-serif"}}
+                  style={{color: 'var(--color-price)', fontFamily: "'IAMAPLAYER',Giants,sans-serif"}}
                 >
                   {formatPrice(item.price)}
                 </p>
@@ -278,7 +281,7 @@ function ProductCard({
           <div className="flex items-center justify-between mt-2">
             <span
               className="font-bold text-sm"
-              style={{color: 'var(--color-primary)', fontFamily: "'IAMAPLAYER',Giants,sans-serif"}}
+              style={{color: 'var(--color-price)', fontFamily: "'IAMAPLAYER',Giants,sans-serif"}}
             >
               {formatPrice(item.price)}
             </span>
@@ -461,8 +464,18 @@ export default function SearchPage() {
   const [size, setSize] = useState('전체')
   const [delivery, setDelivery] = useState<DeliveryType | 'all'>('all')
   const [maxPrice, setMaxPrice] = useState(300)
-  const [sort, setSort] = useState<'latest' | 'price_asc' | 'price_desc' | 'popular' | 'ai_recommend'>('latest')
+  const [sort, setSort] = useState<SearchSort>(initialQuery ? 'relevance' : 'latest')
   const [page, setPage] = useState(0) // 0-based 페이지
+
+  /* 이 화면에 있는 채로 GNB에서 새로 검색하면 같은 라우트라 다시 마운트되지 않으므로, URL의 q가 바뀌면 새 검색으로 맞춘다 */
+  const [urlQuery, setUrlQuery] = useState(initialQuery)
+  if (initialQuery !== urlQuery) {
+    setUrlQuery(initialQuery)
+    setQuery(initialQuery)
+    setInputVal(initialQuery)
+    setSort(initialQuery ? 'relevance' : 'latest')
+    setPage(0)
+  }
   
   /* 모바일 필터 드로어 */
   const [filterOpen, setFilterOpen] = useState(false)
@@ -472,11 +485,13 @@ export default function SearchPage() {
   
   
   const isAiMode = sort === 'ai_recommend'
+  // 검색어를 지워 관련도순이 의미 없어지면 최신순으로 보여준다
+  const activeSort: SearchSort = sort === 'relevance' && !query ? 'latest' : sort
   const currentUserId = useAuthStore((s) => s.user?.id ?? null)
 
   /* API — 일반 검색/필터 목록 */
   const {data, isLoading, isError} = useQuery({
-    queryKey: ['searchListings', query, sport, grade, delivery, maxPrice, sort, page],
+    queryKey: ['searchListings', query, sport, grade, delivery, maxPrice, activeSort, page],
     queryFn: () =>
       getListings({
         keyword: query || undefined,
@@ -484,7 +499,7 @@ export default function SearchPage() {
         condition: grade !== 'all' ? grade : undefined,
         tradeType: delivery !== 'all' ? delivery : undefined,
         maxPrice: maxPrice < 300 ? maxPrice * 1000 : undefined,
-        sort: 'latest',
+        sort: activeSort === 'relevance' || activeSort === 'ai_recommend' ? undefined : activeSort,
         page,
         size: 20,
       }),
@@ -550,6 +565,8 @@ export default function SearchPage() {
   /* 검색 실행 — 새 검색어 입력 시 페이지 초기화 */
   function handleSearch() {
     setQuery(inputVal)
+    // 새 검색은 관련도순부터
+    if (inputVal) setSort('relevance')
     setPage(0)
   }
   
@@ -691,12 +708,12 @@ export default function SearchPage() {
               <PopularSection wishedMap={wishedOverride} onLike={toggleLike}/>
             )}
             {/* 정렬 + 필터 버튼 */}
-            <div className="flex items-center justify-between mb-4 gap-3">
+            <div className="flex flex-wrap items-center justify-between mb-4 gap-3">
               <div className="flex items-center gap-3">
                 {/* 모바일 필터 버튼 */}
                 <button
                   onClick={() => setFilterOpen(true)}
-                  className="md:hidden flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium relative"
+                  className="md:hidden flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium relative whitespace-nowrap"
                   style={{
                     background: 'var(--color-surface)',
                     border: '1px solid var(--color-border)',
@@ -724,18 +741,18 @@ export default function SearchPage() {
               
               {/* 정렬 */}
               <div className="flex gap-1.5 flex-wrap">
-                {SORT_OPTIONS.map(o => {
+                {SORT_OPTIONS.filter(o => o.key !== 'relevance' || query).map(o => {
                   /* AI추천 버튼: 그라디언트 + Sparkles 아이콘 특별 스타일 */
                   const isAi = o.key === 'ai_recommend'
-                  const isActive = sort === o.key
+                  const isActive = activeSort === o.key
                   return (
                     <button
                       key={o.key}
                       onClick={() => {
-                        setSort(o.key as 'latest' | 'price_asc' | 'price_desc' | 'popular' | 'ai_recommend');
+                        setSort(o.key);
                         setPage(0)
                       }}
-                      className="px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1 whitespace-nowrap"
                       style={
                         isAi && isActive
                           ? {background: 'var(--color-accent)', color: '#fff', border: 'none'}

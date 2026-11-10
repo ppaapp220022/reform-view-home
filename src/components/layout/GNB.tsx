@@ -676,7 +676,7 @@ function GnbSearchBar() {
                 <p
                   className="text-xs font-bold flex-shrink-0"
                   style={{
-                    color: 'var(--color-primary)',
+                    color: 'var(--color-price)',
                     fontFamily: "'IAMAPLAYER',Giants,sans-serif",
                   }}
                 >

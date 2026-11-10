@@ -159,6 +159,7 @@
 
     /* Text */
     --color-text-main: rgb(var(--prim-dark));
+    --color-price: var(--color-primary); /* 카드 가격 - 다크 모드에서는 primary(네이비)가 배경에 묻혀 본문색으로 바꾼다 */
     --color-text-sub: rgb(var(--prim-gray1));
     --color-text-hint: rgb(var(--prim-gray2));
     --color-text-disabled: rgb(var(--prim-gray3));
@@ -238,6 +239,7 @@
         --color-surface-overlay: rgba(var(--prim-white), 0.05);
 
         --color-text-main: #E8EEF4;
+        --color-price: var(--color-text-main);
         --color-text-sub: #8B9BB0;
         --color-text-hint: #5A6A7A;
         --color-text-disabled: #3A4A5A;
@@ -298,6 +300,7 @@
     --color-surface-overlay: rgba(var(--prim-white), 0.05);
 
     --color-text-main: #E8EEF4;
+    --color-price: var(--color-text-main);
     --color-text-sub: #8B9BB0;
     --color-text-hint: #5A6A7A;
     --color-text-disabled: #3A4A5A;
